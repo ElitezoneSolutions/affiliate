@@ -12,13 +12,9 @@ export default function HomePage() {
   const router = useRouter()
 
   useEffect(() => {
-    // Only redirect if user is already authenticated and not loading
     if (!loading && user) {
-      if (user.is_admin) {
-        router.replace('/admin/leads')
-      } else {
-        router.replace('/dashboard')
-      }
+      const redirectPath = user.is_admin ? '/admin/leads' : '/dashboard'
+      router.replace(redirectPath)
     }
   }, [user, loading, router])
 
@@ -29,6 +25,8 @@ export default function HomePage() {
       </div>
     )
   }
+
+  const handleCardClick = (path: string) => () => router.push(path)
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
@@ -46,9 +44,8 @@ export default function HomePage() {
 
         <div className="max-w-4xl mx-auto">
           <div className="grid md:grid-cols-2 gap-8">
-            {/* Sign In Card */}
             <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-              <div onClick={() => router.push('/login')}>
+              <div onClick={handleCardClick('/login')}>
                 <CardHeader className="text-center">
                   <CardTitle className="text-2xl">Sign In</CardTitle>
                   <CardDescription>
@@ -64,9 +61,8 @@ export default function HomePage() {
               </div>
             </Card>
 
-            {/* Sign Up Card */}
             <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-              <div onClick={() => router.push('/signup')}>
+              <div onClick={handleCardClick('/signup')}>
                 <CardHeader className="text-center">
                   <CardTitle className="text-2xl">Join Program</CardTitle>
                   <CardDescription>

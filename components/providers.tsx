@@ -32,10 +32,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
         .single()
 
       if (error) {
-        // Check if it's a table doesn't exist error
+        // Handle table doesn't exist error
         if (error.code === '42P01' || error.message.includes('relation "users" does not exist')) {
-          // Create a temporary user object until the database is set up
-          const tempUser = {
+          const tempUser: User = {
             id: userId,
             email: session?.user?.email || '',
             first_name: '',
@@ -51,53 +50,32 @@ export function Providers({ children }: { children: React.ReactNode }) {
           return
         }
         
-        // If user doesn't exist in our table, create them
-        try {
-          const { data: newUser, error: insertError } = await supabase
-            .from('users')
-            .insert({
-              id: userId,
-              email: session?.user?.email || '',
-              first_name: '',
-              last_name: '',
-              is_admin: false,
-            })
-            .select()
-            .single()
+        // Try to create user if they don't exist
+        const { data: newUser, error: insertError } = await supabase
+          .from('users')
+          .insert({
+            id: userId,
+            email: session?.user?.email || '',
+            first_name: '',
+            last_name: '',
+            is_admin: false,
+          })
+          .select()
+          .single()
 
-          if (insertError) {
-            // If it's a duplicate key error, try to fetch the user again
-            if (insertError.message.includes('duplicate key')) {
-              const { data: existingUser, error: fetchError } = await supabase
-                .from('users')
-                .select('*')
-                .eq('id', userId)
-                .single()
-              
-              if (fetchError) {
-                setUser(null)
-              } else {
-                setUser(existingUser)
-              }
-            } else {
-              setUser(null)
-            }
-          } else {
-            setUser(newUser)
-          }
-        } catch (insertError) {
-          // Try to fetch the user again in case the trigger created it
-          const { data: existingUser, error: fetchError } = await supabase
+        if (insertError && insertError.message.includes('duplicate key')) {
+          // User already exists, fetch them
+          const { data: existingUser } = await supabase
             .from('users')
             .select('*')
             .eq('id', userId)
             .single()
           
-          if (fetchError) {
-            setUser(null)
-          } else {
-            setUser(existingUser)
-          }
+          setUser(existingUser)
+        } else if (newUser) {
+          setUser(newUser)
+        } else {
+          setUser(null)
         }
       } else {
         setUser(data)
@@ -136,7 +114,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe()
   }, [fetchUser])
 
-  // Add a small delay to prevent flashing on page refresh
+  // Prevent flashing on page refresh
   useEffect(() => {
     if (!loading && !user && !session) {
       const timer = setTimeout(() => {
