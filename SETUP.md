@@ -17,7 +17,7 @@ This guide will help you set up the complete TrendHijacking Affiliate Program ap
 ### 2. Set up the database schema
 1. Go to your Supabase project dashboard
 2. Navigate to the SQL Editor
-3. Copy and paste the contents of `database-schema.sql` into the editor
+3. Copy and paste the contents of `scripts/setup-database.sql` into the editor
 4. Run the SQL script
 
 ### 3. Configure Authentication

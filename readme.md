@@ -39,7 +39,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 ```
 
 ### 3. Run Database Schema
-Copy the contents of `cleanup-and-setup-simple.sql` and run it in your Supabase SQL Editor.
+Copy the contents of `scripts/setup-database.sql` and run it in your Supabase SQL Editor.
 
 ### 4. Start Development
 ```bash
@@ -103,7 +103,8 @@ custom/
 ├── lib/                  # Utilities
 │   ├── supabase.ts       # Supabase client
 │   └── utils.ts          # Helper functions
-└── cleanup-and-setup-simple.sql  # Database schema
+└── scripts/              # Database setup
+    └── setup-database.sql # Complete database schema
 ```
 
 ## 🎯 Next Steps
