@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '@/components/providers'
 import { useRouter, useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
@@ -66,25 +66,7 @@ export default function UserLeadsPage() {
     price: 0
   })
 
-  useEffect(() => {
-    if (!currentUser) {
-      router.replace('/login')
-      return
-    }
-
-    if (!currentUser.is_admin) {
-      router.replace('/dashboard')
-      return
-    }
-
-    fetchUserLeads()
-  }, [currentUser, router, userId])
-
-  useEffect(() => {
-    filterLeads()
-  }, [leads, searchTerm, statusFilter])
-
-  const fetchUserLeads = async () => {
+  const fetchUserLeads = useCallback(async () => {
     try {
       setLoading(true)
       setError('')
@@ -114,9 +96,9 @@ export default function UserLeadsPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [userId])
 
-  const filterLeads = () => {
+  const filterLeads = useCallback(() => {
     let filtered = leads
 
     // Apply search filter
@@ -133,7 +115,7 @@ export default function UserLeadsPage() {
     }
 
     setFilteredLeads(filtered)
-  }
+  }, [leads, searchTerm, statusFilter])
 
   const startEdit = (lead: UserLead) => {
     setEditingLead(lead.id)
@@ -232,6 +214,21 @@ export default function UserLeadsPage() {
 
     return { total, approved, pending, rejected, totalEarnings, paidEarnings }
   }
+
+  useEffect(() => {
+    if (!currentUser) return
+
+    if (!currentUser.is_admin) {
+      router.replace('/dashboard')
+      return
+    }
+
+    fetchUserLeads()
+  }, [currentUser, router, userId, fetchUserLeads])
+
+  useEffect(() => {
+    filterLeads()
+  }, [leads, searchTerm, statusFilter, filterLeads])
 
   if (loading) {
     return <LoadingSpinner />

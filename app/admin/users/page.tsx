@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import Image from 'next/image'
 import { 
   Users, 
   Search, 
@@ -17,9 +18,10 @@ import {
   FileText,
   Calendar,
   Eye,
-  LogOut,
+  Ban,
   AlertCircle,
-  ArrowLeft
+  ArrowLeft,
+  User
 } from 'lucide-react'
 import Link from 'next/link'
 import { AdminLayout } from '@/components/admin-layout'
@@ -30,6 +32,8 @@ interface UserWithStats {
   first_name: string
   last_name: string
   is_admin: boolean
+  is_suspended?: boolean
+  profile_image?: string
   created_at: string
   total_leads: number
   approved_leads: number
@@ -165,6 +169,28 @@ export default function AdminUsersPage() {
     router.replace('/')
   }
 
+  const handleSuspendUser = async (userId: string, currentStatus: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('users')
+        .update({ is_suspended: !currentStatus })
+        .eq('id', userId)
+
+      if (error) throw error
+
+      // Update local state
+      setUsers(prev => prev.map(user => 
+        user.id === userId ? { ...user, is_suspended: !currentStatus } : user
+      ))
+      setFilteredUsers(prev => prev.map(user => 
+        user.id === userId ? { ...user, is_suspended: !currentStatus } : user
+      ))
+
+    } catch (error: any) {
+      setError(error.message)
+    }
+  }
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -183,8 +209,8 @@ export default function AdminUsersPage() {
 
   return (
     <AdminLayout>
-      <div className="p-6">
-        <div className="max-w-7xl mx-auto">
+      <div className="p-4">
+        <div className="max-w-[1400px] mx-auto">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">User Management</h1>
           <p className="text-gray-600">Manage all users and view their performance</p>
@@ -307,7 +333,7 @@ export default function AdminUsersPage() {
 
         {/* Users Table */}
         <Card>
-          <CardHeader>
+          <CardHeader className="py-4">
             <CardTitle>All Users ({filteredUsers.length})</CardTitle>
             <CardDescription>
               Detailed view of all users and their performance metrics
@@ -321,75 +347,88 @@ export default function AdminUsersPage() {
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full">
+                <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b">
-                      <th className="text-left py-3 px-4 font-medium">User</th>
-                      <th className="text-left py-3 px-4 font-medium">Role</th>
-                      <th className="text-left py-3 px-4 font-medium">Leads</th>
-                      <th className="text-left py-3 px-4 font-medium">Earnings</th>
-                      <th className="text-left py-3 px-4 font-medium">Payouts</th>
-                      <th className="text-left py-3 px-4 font-medium">Joined</th>
-                      <th className="text-left py-3 px-4 font-medium">Last Activity</th>
-                      <th className="text-left py-3 px-4 font-medium">Actions</th>
+                      <th className="text-left py-2 px-3 font-medium">User</th>
+                      <th className="text-left py-2 px-3 font-medium">Role</th>
+                      <th className="text-left py-2 px-3 font-medium">Leads</th>
+                      <th className="text-left py-2 px-3 font-medium">Earnings</th>
+                      <th className="text-left py-2 px-3 font-medium">Last Active</th>
+                      <th className="text-left py-2 px-3 font-medium">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {filteredUsers.map((user) => (
                       <tr key={user.id} className="border-b hover:bg-gray-50">
-                        <td className="py-3 px-4">
-                          <div>
-                            <div className="font-medium">
-                              {user.first_name} {user.last_name}
+                        <td className="py-2 px-3">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center overflow-hidden">
+                              {user.profile_image ? (
+                                <Image 
+                                  src={user.profile_image} 
+                                  alt="Profile" 
+                                  width={40}
+                                  height={40}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <User className="h-5 w-5 text-gray-500" />
+                              )}
                             </div>
-                            <div className="text-sm text-gray-600">{user.email}</div>
+                            <div>
+                              <div className="font-medium flex items-center gap-2">
+                                {user.first_name} {user.last_name}
+                                {user.is_suspended && (
+                                  <Badge variant="destructive" className="text-xs">Suspended</Badge>
+                                )}
+                              </div>
+                              <div className="text-xs text-gray-600">{user.email}</div>
+                            </div>
                           </div>
                         </td>
-                        <td className="py-3 px-4">
-                          <Badge variant={user.is_admin ? "default" : "secondary"}>
+                        <td className="py-2 px-3">
+                          <Badge variant={user.is_admin ? "default" : "secondary"} className="text-xs">
                             {user.is_admin ? 'Admin' : 'Affiliate'}
                           </Badge>
                         </td>
-                        <td className="py-3 px-4">
-                          <div className="text-sm">
+                        <td className="py-2 px-3">
+                          <div className="text-xs space-y-1">
                             <div>Total: {user.total_leads}</div>
                             <div className="text-green-600">✓ {user.approved_leads}</div>
                             <div className="text-yellow-600">⏳ {user.pending_leads}</div>
-                            <div className="text-red-600">✗ {user.rejected_leads}</div>
                           </div>
                         </td>
-                        <td className="py-3 px-4">
-                          <div className="text-sm">
+                        <td className="py-2 px-3">
+                          <div className="text-xs space-y-1">
                             <div className="font-medium">${user.total_earnings}</div>
                             <div className="text-green-600">Paid: ${user.paid_earnings}</div>
-                            <div className="text-orange-600">Unpaid: ${user.unpaid_earnings}</div>
+                            <div className="text-orange-600">Due: ${user.unpaid_earnings}</div>
                           </div>
                         </td>
-                        <td className="py-3 px-4">
-                          <div className="text-sm">
-                            {user.payout_requests} requests
-                          </div>
-                        </td>
-                        <td className="py-3 px-4 text-sm">
-                          {formatDate(user.created_at)}
-                        </td>
-                        <td className="py-3 px-4 text-sm">
+                        <td className="py-2 px-3 text-xs">
                           {user.last_lead_date ? formatDate(user.last_lead_date) : 'Never'}
                         </td>
-                        <td className="py-3 px-4">
-                          <div className="flex gap-2">
+                        <td className="py-2 px-3">
+                          <div className="flex gap-1">
                             <Link href={`/admin/users/${user.id}`}>
-                              <Button variant="outline" size="sm">
-                                <Eye className="h-4 w-4 mr-1" />
-                                View
+                              <Button variant="outline" size="sm" className="h-8 px-2">
+                                <Eye className="h-4 w-4" />
                               </Button>
                             </Link>
                             <Link href={`/admin/users/${user.id}/leads`}>
-                              <Button variant="outline" size="sm">
-                                <FileText className="h-4 w-4 mr-1" />
-                                Leads
+                              <Button variant="outline" size="sm" className="h-8 px-2">
+                                <FileText className="h-4 w-4" />
                               </Button>
                             </Link>
+                            <Button 
+                              variant={user.is_suspended ? "outline" : "destructive"} 
+                              size="sm" 
+                              className="h-8 px-2"
+                              onClick={() => handleSuspendUser(user.id, !!user.is_suspended)}
+                            >
+                              <Ban className="h-4 w-4" />
+                            </Button>
                           </div>
                         </td>
                       </tr>

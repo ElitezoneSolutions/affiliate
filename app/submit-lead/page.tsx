@@ -16,16 +16,9 @@ import { DashboardNav } from '@/components/dashboard-nav'
 import Link from 'next/link'
 
 const PROGRAMS = [
-  'Digital Marketing',
-  'SEO Services',
-  'Social Media Management',
-  'Content Marketing',
-  'PPC Advertising',
-  'Email Marketing',
-  'Web Design',
-  'E-commerce Solutions',
-  'Brand Strategy',
-  'Other'
+  'The Smart Acquisition Program',
+  'The Acquisition Partnership',
+  'The Automation Program'
 ]
 
 export default function SubmitLeadPage() {
@@ -55,11 +48,39 @@ export default function SubmitLeadPage() {
       return
     }
 
-    // Basic validation
-    if (!formData.full_name || !formData.email || !formData.program) {
-      setError('Please fill in all required fields')
+    // Validate required fields
+    if (!formData.full_name.trim()) {
+      setError('Full name is required')
       setLoading(false)
       return
+    }
+
+    if (!formData.email.trim()) {
+      setError('Email is required')
+      setLoading(false)
+      return
+    }
+
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(formData.email.trim())) {
+      setError('Please enter a valid email address')
+      setLoading(false)
+      return
+    }
+
+    if (!formData.program) {
+      setError('Please select a program')
+      setLoading(false)
+      return
+    }
+
+    // Optional website validation if provided
+    if (formData.website.trim() && !formData.website.trim().startsWith('http')) {
+      setFormData(prev => ({
+        ...prev,
+        website: `https://${formData.website.trim()}`
+      }))
     }
 
     try {
@@ -67,12 +88,12 @@ export default function SubmitLeadPage() {
         .from('leads')
         .insert({
           affiliate_id: user.id,
-          full_name: formData.full_name,
-          email: formData.email,
-          phone: formData.phone,
-          website: formData.website,
+          full_name: formData.full_name.trim(),
+          email: formData.email.trim(),
+          phone: formData.phone.trim(),
+          website: formData.website.trim() || null, // Set to null if empty
           program: formData.program,
-          lead_note: formData.lead_note,
+          lead_note: formData.lead_note.trim(),
           status: 'pending',
           paid: false,
           call_requested: false
@@ -205,11 +226,11 @@ export default function SubmitLeadPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="website">Website</Label>
+                    <Label htmlFor="website">Website (Optional)</Label>
                     <Input
                       id="website"
                       type="url"
-                      placeholder="Lead's website URL"
+                      placeholder="Lead's website URL (optional)"
                       value={formData.website}
                       onChange={(e) => handleInputChange('website', e.target.value)}
                     />

@@ -1,17 +1,9 @@
 {
-  "/_not-found/page": "app/_not-found/page.js",
-  "/admin/users/page": "app/admin/users/page.js",
-  "/admin/leads/page": "app/admin/leads/page.js",
-  "/admin/users/[userId]/page": "app/admin/users/[userId]/page.js",
-  "/admin/users/[userId]/leads/page": "app/admin/users/[userId]/leads/page.js",
-  "/admin/payouts/page": "app/admin/payouts/page.js",
-  "/admin/page": "app/admin/page.js",
   "/login/page": "app/login/page.js",
-  "/page": "app/page.js",
-  "/dashboard/account-settings/page": "app/dashboard/account-settings/page.js",
+  "/admin/payouts/page": "app/admin/payouts/page.js",
   "/dashboard/page": "app/dashboard/page.js",
   "/dashboard/payouts/page": "app/dashboard/payouts/page.js",
-  "/submit-lead/page": "app/submit-lead/page.js",
-  "/dashboard/payout-settings/page": "app/dashboard/payout-settings/page.js",
-  "/signup/page": "app/signup/page.js"
+  "/dashboard/account-settings/page": "app/dashboard/account-settings/page.js",
+  "/admin/leads/page": "app/admin/leads/page.js",
+  "/admin/page": "app/admin/page.js"
 }

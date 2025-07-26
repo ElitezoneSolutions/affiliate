@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react'
 import { supabase, User } from '@/lib/supabase'
 import { Session } from '@supabase/supabase-js'
+import { setAuthCookie, getAuthCookie, clearAuthCookie } from '@/lib/cookies'
 
 interface AuthContextType {
   user: User | null
@@ -23,8 +24,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
 
-  const fetchUser = useCallback(async (userId: string) => {
+  const fetchUser = useCallback(async (userId: string, userEmail: string) => {
     try {
+      console.log('🔍 Fetching user data for:', userEmail)
+      
       const { data, error } = await supabase
         .from('users')
         .select('*')
@@ -32,21 +35,18 @@ export function Providers({ children }: { children: React.ReactNode }) {
         .single()
 
       if (error) {
-        // Handle table doesn't exist error
         if (error.code === '42P01' || error.message.includes('relation "users" does not exist')) {
+          console.log('📋 Creating temporary user (table doesn\'t exist)')
           const tempUser: User = {
             id: userId,
-            email: session?.user?.email || '',
+            email: userEmail,
             first_name: '',
             last_name: '',
             profile_image: '',
             is_admin: false,
-            payout_method: undefined,
-            payout_details: undefined,
             created_at: new Date().toISOString()
           }
           setUser(tempUser)
-          setLoading(false)
           return
         }
         
@@ -55,7 +55,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
           .from('users')
           .insert({
             id: userId,
-            email: session?.user?.email || '',
+            email: userEmail,
             first_name: '',
             last_name: '',
             is_admin: false,
@@ -63,69 +63,140 @@ export function Providers({ children }: { children: React.ReactNode }) {
           .select()
           .single()
 
-        if (insertError && insertError.message.includes('duplicate key')) {
-          // User already exists, fetch them
-          const { data: existingUser } = await supabase
-            .from('users')
-            .select('*')
-            .eq('id', userId)
-            .single()
-          
-          setUser(existingUser)
+        if (insertError) {
+          if (insertError.message.includes('duplicate key')) {
+            // User exists, fetch them
+            const { data: existingUser } = await supabase
+              .from('users')
+              .select('*')
+              .eq('id', userId)
+              .single()
+            
+            if (existingUser) {
+              console.log('✅ Fetched existing user')
+              setUser(existingUser)
+            }
+          } else {
+            console.error('❌ Error creating user:', insertError)
+            setUser(null)
+          }
         } else if (newUser) {
+          console.log('✅ Created new user')
           setUser(newUser)
-        } else {
-          setUser(null)
         }
       } else {
+        console.log('✅ Fetched user data')
         setUser(data)
       }
     } catch (error) {
+      console.error('❌ Error in fetchUser:', error)
       setUser(null)
-    } finally {
-      setLoading(false)
     }
-  }, [session?.user?.email])
+  }, [])
 
   useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session)
-      if (session?.user) {
-        fetchUser(session.user.id)
-      } else {
-        setLoading(false)
-      }
-    })
+    let mounted = true
 
-    // Listen for auth changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      setSession(session)
-      if (session?.user) {
-        await fetchUser(session.user.id)
-      } else {
+    const initializeAuth = async () => {
+      try {
+        // Get session from Supabase
+        const { data: { session: initialSession }, error: sessionError } = await supabase.auth.getSession()
+        
+        if (!mounted) return
+        
+        if (sessionError) {
+          console.error('❌ Session error:', sessionError)
+          throw sessionError
+        }
+
+        if (initialSession) {
+          console.log('✅ Found Supabase session')
+          setSession(initialSession)
+          setAuthCookie(initialSession)
+          await fetchUser(initialSession.user.id, initialSession.user.email || '')
+        } else {
+          // Try to restore from cookies
+          console.log('🔄 Trying to restore from cookies...')
+          const cookieSession = getAuthCookie()
+          
+          if (cookieSession?.access_token && cookieSession?.refresh_token) {
+            try {
+              const { data: { session: restoredSession }, error: restoreError } = await supabase.auth.setSession({
+                access_token: cookieSession.access_token,
+                refresh_token: cookieSession.refresh_token
+              })
+
+              if (restoreError) {
+                console.error('❌ Error restoring session:', restoreError)
+                clearAuthCookie()
+                throw restoreError
+              }
+
+              if (restoredSession) {
+                console.log('✅ Restored session from cookies')
+                setSession(restoredSession)
+                await fetchUser(restoredSession.user.id, restoredSession.user.email || '')
+              }
+            } catch (error) {
+              console.error('❌ Failed to restore session:', error)
+              clearAuthCookie()
+            }
+          } else {
+            console.log('❌ No session found')
+            setUser(null)
+            setSession(null)
+          }
+        }
+      } catch (error) {
+        console.error('❌ Auth initialization error:', error)
         setUser(null)
-        setLoading(false)
+        setSession(null)
+        clearAuthCookie()
+      } finally {
+        if (mounted) {
+          setLoading(false)
+        }
+      }
+    }
+
+    // Set up auth state change listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
+      if (!mounted) return
+
+      console.log('🔄 Auth state change:', event)
+
+      if (currentSession) {
+        console.log('✅ New session detected')
+        setSession(currentSession)
+        setAuthCookie(currentSession)
+        await fetchUser(currentSession.user.id, currentSession.user.email || '')
+      } else {
+        console.log('❌ Session ended')
+        setUser(null)
+        setSession(null)
+        clearAuthCookie()
       }
     })
 
-    return () => subscription.unsubscribe()
+    // Initialize
+    initializeAuth()
+
+    return () => {
+      mounted = false
+      subscription.unsubscribe()
+    }
   }, [fetchUser])
 
-  // Prevent flashing on page refresh
-  useEffect(() => {
-    if (!loading && !user && !session) {
-      const timer = setTimeout(() => {
-        setLoading(false)
-      }, 100)
-      return () => clearTimeout(timer)
-    }
-  }, [loading, user, session])
-
   const signOut = async () => {
-    await supabase.auth.signOut()
+    try {
+      await supabase.auth.signOut()
+      clearAuthCookie()
+      setUser(null)
+      setSession(null)
+      console.log('✅ Signed out successfully')
+    } catch (error) {
+      console.error('❌ Sign out error:', error)
+    }
   }
 
   return (

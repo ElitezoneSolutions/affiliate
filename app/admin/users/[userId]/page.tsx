@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '@/components/providers'
 import { useRouter, useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
@@ -8,19 +8,28 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Textarea } from '@/components/ui/textarea'
+import Image from 'next/image'
 import { 
-  Users, 
+  ArrowLeft, 
+  Mail, 
+  Calendar, 
   DollarSign, 
-  FileText,
+  TrendingUp, 
+  Clock, 
+  CheckCircle, 
+  XCircle,
+  Users,
   CreditCard,
-  Calendar,
-  Mail,
-  User,
-  ArrowLeft,
   AlertCircle,
-  CheckCircle,
-  Clock,
-  XCircle
+  User,
+  FileText,
+  Ban,
+  Shield,
+  Save,
+  Trash2
 } from 'lucide-react'
 import Link from 'next/link'
 import { AdminLayout } from '@/components/admin-layout'
@@ -32,6 +41,7 @@ interface UserDetails {
   first_name: string
   last_name: string
   is_admin: boolean
+  is_suspended: boolean
   created_at: string
   profile_image?: string
   payout_method?: string
@@ -52,8 +62,9 @@ interface UserStats {
 
 interface RecentLead {
   id: string
-  title: string
-  description: string
+  full_name: string
+  email: string
+  program: string
   status: string
   price: number
   created_at: string
@@ -67,8 +78,19 @@ export default function UserDetailsPage() {
   const userId = params.userId as string
   
   const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
   const [userDetails, setUserDetails] = useState<UserDetails | null>(null)
+  const [editForm, setEditForm] = useState({
+    first_name: '',
+    last_name: '',
+    email: '',
+    is_admin: false,
+    is_suspended: false,
+    payout_method: '',
+    payout_details: ''
+  })
   const [userStats, setUserStats] = useState<UserStats>({
     total_leads: 0,
     approved_leads: 0,
@@ -81,21 +103,7 @@ export default function UserDetailsPage() {
   })
   const [recentLeads, setRecentLeads] = useState<RecentLead[]>([])
 
-  useEffect(() => {
-    if (!currentUser) {
-      router.replace('/login')
-      return
-    }
-
-    if (!currentUser.is_admin) {
-      router.replace('/dashboard')
-      return
-    }
-
-    fetchUserDetails()
-  }, [currentUser, router, userId])
-
-  const fetchUserDetails = async () => {
+  const fetchUserDetails = useCallback(async () => {
     try {
       setLoading(true)
       setError('')
@@ -109,6 +117,15 @@ export default function UserDetailsPage() {
 
       if (userError) throw userError
       setUserDetails(user)
+      setEditForm({
+        first_name: user.first_name || '',
+        last_name: user.last_name || '',
+        email: user.email || '',
+        is_admin: user.is_admin || false,
+        is_suspended: user.is_suspended || false,
+        payout_method: user.payout_method || '',
+        payout_details: user.payout_details || ''
+      })
 
       // Fetch user's leads
       const { data: leads, error: leadsError } = await supabase
@@ -129,6 +146,12 @@ export default function UserDetailsPage() {
       const unpaidEarnings = totalEarnings - paidEarnings
       const lastLeadDate = leads?.[0]?.created_at
 
+      // Fetch payout requests count
+      const { count: payoutCount } = await supabase
+        .from('payout_requests')
+        .select('id', { count: 'exact' })
+        .eq('affiliate_id', userId)
+
       setUserStats({
         total_leads: totalLeads,
         approved_leads: approvedLeads,
@@ -137,7 +160,7 @@ export default function UserDetailsPage() {
         total_earnings: totalEarnings,
         unpaid_earnings: unpaidEarnings,
         paid_earnings: paidEarnings,
-        payout_requests: 0, // TODO: Fetch from payout_requests table
+        payout_requests: payoutCount || 0,
         last_lead_date: lastLeadDate
       })
 
@@ -149,6 +172,73 @@ export default function UserDetailsPage() {
     } finally {
       setLoading(false)
     }
+  }, [userId])
+
+  useEffect(() => {
+    if (!currentUser) {
+      router.replace('/login')
+      return
+    }
+
+    if (!currentUser.is_admin) {
+      router.replace('/dashboard')
+      return
+    }
+
+    fetchUserDetails()
+  }, [currentUser, router, userId, fetchUserDetails])
+
+  const handleSave = async () => {
+    try {
+      setSaving(true)
+      setError('')
+      setSuccess('')
+
+      const { error } = await supabase
+        .from('users')
+        .update({
+          first_name: editForm.first_name,
+          last_name: editForm.last_name,
+          email: editForm.email,
+          is_admin: editForm.is_admin,
+          is_suspended: editForm.is_suspended,
+          payout_method: editForm.payout_method,
+          payout_details: editForm.payout_details
+        })
+        .eq('id', userId)
+
+      if (error) throw error
+
+      setSuccess('User details updated successfully')
+      fetchUserDetails() // Refresh data
+    } catch (error: any) {
+      setError(error.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!window.confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
+      return
+    }
+
+    try {
+      setSaving(true)
+      setError('')
+
+      const { error } = await supabase
+        .from('users')
+        .delete()
+        .eq('id', userId)
+
+      if (error) throw error
+
+      router.replace('/admin/users')
+    } catch (error: any) {
+      setError(error.message)
+      setSaving(false)
+    }
   }
 
   const formatDate = (dateString: string) => {
@@ -159,19 +249,6 @@ export default function UserDetailsPage() {
       hour: '2-digit',
       minute: '2-digit'
     })
-  }
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'approved':
-        return <CheckCircle className="h-4 w-4 text-green-600" />
-      case 'pending':
-        return <Clock className="h-4 w-4 text-yellow-600" />
-      case 'rejected':
-        return <XCircle className="h-4 w-4 text-red-600" />
-      default:
-        return <Clock className="h-4 w-4 text-gray-600" />
-    }
   }
 
   const getStatusBadge = (status: string) => {
@@ -233,6 +310,13 @@ export default function UserDetailsPage() {
             </Alert>
           )}
 
+          {success && (
+            <Alert className="mb-6 bg-green-50 text-green-800 border-green-200">
+              <CheckCircle className="h-4 w-4" />
+              <AlertDescription>{success}</AlertDescription>
+            </Alert>
+          )}
+
           {/* User Profile */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
             <Card className="lg:col-span-1">
@@ -244,11 +328,13 @@ export default function UserDetailsPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center">
+                  <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center overflow-hidden">
                     {userDetails.profile_image ? (
-                      <img 
+                      <Image 
                         src={userDetails.profile_image} 
                         alt="Profile" 
+                        width={64}
+                        height={64}
                         className="w-16 h-16 rounded-full object-cover"
                       />
                     ) : (
@@ -259,27 +345,104 @@ export default function UserDetailsPage() {
                     <div className="font-medium">
                       {userDetails.first_name} {userDetails.last_name}
                     </div>
-                    <Badge variant={userDetails.is_admin ? "default" : "secondary"}>
-                      {userDetails.is_admin ? 'Admin' : 'Affiliate'}
-                    </Badge>
+                    <div className="flex gap-2">
+                      <Badge variant={userDetails.is_admin ? "default" : "secondary"}>
+                        {userDetails.is_admin ? 'Admin' : 'Affiliate'}
+                      </Badge>
+                      {userDetails.is_suspended && (
+                        <Badge variant="destructive">Suspended</Badge>
+                      )}
+                    </div>
                   </div>
                 </div>
                 
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2 text-sm">
-                    <Mail className="h-4 w-4 text-gray-500" />
-                    <span>{userDetails.email}</span>
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-sm font-medium">First Name</label>
+                    <Input
+                      value={editForm.first_name}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, first_name: e.target.value }))}
+                    />
                   </div>
-                  <div className="flex items-center gap-2 text-sm">
-                    <Calendar className="h-4 w-4 text-gray-500" />
-                    <span>Joined {formatDate(userDetails.created_at)}</span>
+                  
+                  <div>
+                    <label className="text-sm font-medium">Last Name</label>
+                    <Input
+                      value={editForm.last_name}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, last_name: e.target.value }))}
+                    />
                   </div>
-                  {userDetails.payout_method && (
-                    <div className="flex items-center gap-2 text-sm">
-                      <CreditCard className="h-4 w-4 text-gray-500" />
-                      <span>Payout: {userDetails.payout_method}</span>
-                    </div>
-                  )}
+
+                  <div>
+                    <label className="text-sm font-medium">Email</label>
+                    <Input
+                      value={editForm.email}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, email: e.target.value }))}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-medium">Payout Method</label>
+                    <Select 
+                      value={editForm.payout_method} 
+                      onValueChange={(value) => setEditForm(prev => ({ ...prev, payout_method: value }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select payout method" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="paypal">PayPal</SelectItem>
+                        <SelectItem value="wise">Wise</SelectItem>
+                        <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-medium">Payout Details</label>
+                    <Textarea
+                      value={editForm.payout_details}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, payout_details: e.target.value }))}
+                      rows={3}
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={editForm.is_admin}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, is_admin: e.target.checked }))}
+                      className="rounded border-gray-300"
+                    />
+                    <label className="text-sm font-medium flex items-center gap-1">
+                      <Shield className="h-4 w-4" />
+                      Admin Access
+                    </label>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={editForm.is_suspended}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, is_suspended: e.target.checked }))}
+                      className="rounded border-gray-300"
+                    />
+                    <label className="text-sm font-medium flex items-center gap-1">
+                      <Ban className="h-4 w-4" />
+                      Suspend Account
+                    </label>
+                  </div>
+
+                  <div className="flex gap-2 pt-4">
+                    <Button onClick={handleSave} disabled={saving}>
+                      <Save className="h-4 w-4 mr-2" />
+                      Save Changes
+                    </Button>
+                    <Button variant="destructive" onClick={handleDelete} disabled={saving}>
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete User
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -288,25 +451,25 @@ export default function UserDetailsPage() {
             <Card className="lg:col-span-2">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <DollarSign className="h-5 w-5" />
+                  <TrendingUp className="h-5 w-5" />
                   Performance Statistics
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="text-center">
+                  <div className="text-center p-4 bg-blue-50 rounded-lg">
                     <div className="text-2xl font-bold text-blue-600">{userStats.total_leads}</div>
                     <div className="text-sm text-gray-600">Total Leads</div>
                   </div>
-                  <div className="text-center">
+                  <div className="text-center p-4 bg-green-50 rounded-lg">
                     <div className="text-2xl font-bold text-green-600">{userStats.approved_leads}</div>
                     <div className="text-sm text-gray-600">Approved</div>
                   </div>
-                  <div className="text-center">
+                  <div className="text-center p-4 bg-yellow-50 rounded-lg">
                     <div className="text-2xl font-bold text-yellow-600">{userStats.pending_leads}</div>
                     <div className="text-sm text-gray-600">Pending</div>
                   </div>
-                  <div className="text-center">
+                  <div className="text-center p-4 bg-red-50 rounded-lg">
                     <div className="text-2xl font-bold text-red-600">{userStats.rejected_leads}</div>
                     <div className="text-sm text-gray-600">Rejected</div>
                   </div>
@@ -324,6 +487,26 @@ export default function UserDetailsPage() {
                   <div className="text-center p-4 bg-orange-50 rounded-lg">
                     <div className="text-2xl font-bold text-orange-600">${userStats.unpaid_earnings}</div>
                     <div className="text-sm text-gray-600">Unpaid</div>
+                  </div>
+                </div>
+
+                <div className="mt-6">
+                  <div className="text-sm text-gray-600 mb-2">Activity Timeline</div>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-sm">
+                      <Calendar className="h-4 w-4 text-gray-500" />
+                      <span>Joined {formatDate(userDetails.created_at)}</span>
+                    </div>
+                    {userStats.last_lead_date && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <Clock className="h-4 w-4 text-gray-500" />
+                        <span>Last Lead: {formatDate(userStats.last_lead_date)}</span>
+                      </div>
+                    )}
+                    <div className="flex items-center gap-2 text-sm">
+                      <CreditCard className="h-4 w-4 text-gray-500" />
+                      <span>Payout Requests: {userStats.payout_requests}</span>
+                    </div>
                   </div>
                 </div>
               </CardContent>
@@ -360,17 +543,14 @@ export default function UserDetailsPage() {
                 <div className="space-y-4">
                   {recentLeads.map((lead) => (
                     <div key={lead.id} className="flex items-center justify-between p-4 border rounded-lg">
-                      <div className="flex items-center gap-4">
-                        {getStatusIcon(lead.status)}
-                        <div>
-                          <div className="font-medium">{lead.title}</div>
-                          <div className="text-sm text-gray-600">{lead.description}</div>
-                          <div className="text-xs text-gray-500">{formatDate(lead.created_at)}</div>
-                        </div>
+                      <div>
+                        <div className="font-medium">{lead.full_name}</div>
+                        <div className="text-sm text-gray-600">{lead.program}</div>
+                        <div className="text-xs text-gray-500">{formatDate(lead.created_at)}</div>
                       </div>
                       <div className="flex items-center gap-4">
                         <div className="text-right">
-                          <div className="font-medium">${lead.price}</div>
+                          <div className="font-medium">${lead.price || 0}</div>
                           {getStatusBadge(lead.status)}
                         </div>
                         {lead.paid && (

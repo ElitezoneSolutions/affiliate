@@ -59,10 +59,18 @@ export default function PayoutSettingsPage() {
     }
     
     if (user.payout_details) {
-      setPayoutDetails(prev => ({
-        ...prev,
-        ...user.payout_details
-      }))
+      try {
+        const details = typeof user.payout_details === 'string' 
+          ? JSON.parse(user.payout_details) 
+          : user.payout_details
+        
+        setPayoutDetails(prev => ({
+          ...prev,
+          ...details
+        }))
+      } catch (error) {
+        console.error('Error parsing payout details:', error)
+      }
     }
   }, [user, router])
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '@/components/providers'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
@@ -38,21 +38,7 @@ export default function PayoutsPage() {
   const [requestingPayout, setRequestingPayout] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
-  useEffect(() => {
-    if (!user) {
-      router.replace('/login')
-      return
-    }
-
-    if (user.is_admin) {
-      router.replace('/admin/leads')
-      return
-    }
-
-    fetchPayoutData()
-  }, [user, router])
-
-  const fetchPayoutData = async () => {
+  const fetchPayoutData = useCallback(async () => {
     try {
       // Fetch unpaid earnings
       const { data: leads, error: leadsError } = await supabase
@@ -81,7 +67,21 @@ export default function PayoutsPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [user?.id])
+
+  useEffect(() => {
+    if (!user) {
+      router.replace('/login')
+      return
+    }
+
+    if (user.is_admin) {
+      router.replace('/admin/leads')
+      return
+    }
+
+    fetchPayoutData()
+  }, [user, router, fetchPayoutData])
 
   const handleRequestPayout = async () => {
     if (unpaidEarnings < 100) {

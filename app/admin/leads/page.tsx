@@ -26,6 +26,12 @@ import {
 } from 'lucide-react'
 import { AdminLayout } from '@/components/admin-layout'
 
+const PROGRAMS = [
+  'The Smart Acquisition Program',
+  'The Acquisition Partnership',
+  'The Automation Program'
+]
+
 export default function AdminLeadsPage() {
   const { user } = useAuth()
   const router = useRouter()
@@ -174,14 +180,16 @@ export default function AdminLeadsPage() {
     try {
       setError('')
       
+      const updates = {
+        status: editForm.status as 'pending' | 'approved' | 'rejected',
+        price: editForm.price ? parseFloat(editForm.price) : null,
+        admin_note: editForm.admin_note,
+        call_meeting_link: editForm.call_meeting_link
+      }
+      
       const { error } = await supabase
         .from('leads')
-        .update({
-          status: editForm.status,
-          price: editForm.price ? parseFloat(editForm.price) : null,
-          admin_note: editForm.admin_note,
-          call_meeting_link: editForm.call_meeting_link
-        })
+        .update(updates)
         .eq('id', leadId)
 
       if (error) throw error
@@ -190,17 +198,15 @@ export default function AdminLeadsPage() {
       setLeads(prev => prev.map(lead => 
         lead.id === leadId ? {
           ...lead,
-          status: editForm.status as any,
-          price: editForm.price ? parseFloat(editForm.price) : null,
-          admin_note: editForm.admin_note,
-          call_meeting_link: editForm.call_meeting_link
+          status: updates.status,
+          price: updates.price,
+          admin_note: updates.admin_note,
+          call_meeting_link: updates.call_meeting_link
         } : lead
       ))
 
       setEditingLead(null)
-      
-      // Show success message (you can add a success state if needed)
-      console.log('Lead updated successfully!')
+      setError('') // Clear any previous errors
       
     } catch (error: any) {
       setError(error.message)
@@ -286,16 +292,9 @@ export default function AdminLeadsPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Programs</SelectItem>
-                    <SelectItem value="Digital Marketing">Digital Marketing</SelectItem>
-                    <SelectItem value="SEO Services">SEO Services</SelectItem>
-                    <SelectItem value="Social Media Management">Social Media Management</SelectItem>
-                    <SelectItem value="Content Marketing">Content Marketing</SelectItem>
-                    <SelectItem value="PPC Advertising">PPC Advertising</SelectItem>
-                    <SelectItem value="Email Marketing">Email Marketing</SelectItem>
-                    <SelectItem value="Web Design">Web Design</SelectItem>
-                    <SelectItem value="E-commerce Solutions">E-commerce Solutions</SelectItem>
-                    <SelectItem value="Brand Strategy">Brand Strategy</SelectItem>
-                    <SelectItem value="Other">Other</SelectItem>
+                    {PROGRAMS.map((program) => (
+                      <SelectItem key={program} value={program}>{program}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>

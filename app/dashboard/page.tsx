@@ -20,6 +20,7 @@ import {
   User
 } from 'lucide-react'
 import Link from 'next/link'
+import { LeadDetailsModal } from '@/components/lead-details-modal'
 
 export default function DashboardPage() {
   const { user, signOut, loading } = useAuth()
@@ -34,6 +35,7 @@ export default function DashboardPage() {
     totalEarnings: 0,
     unpaidEarnings: 0
   })
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
 
   const fetchLeads = useCallback(async () => {
     try {
@@ -90,35 +92,68 @@ export default function DashboardPage() {
   }, [user?.id])
 
   useEffect(() => {
-    // Don't redirect if still loading
-    if (loading) return
-
-    if (!user) {
-      router.replace('/login')
+    // Don't do anything if still loading
+    if (loading) {
+      console.log('⏳ Dashboard: Still loading, waiting...')
       return
     }
 
-    if (user.is_admin) {
+    console.log('🔍 Dashboard: Checking authentication state...')
+    console.log('User:', user?.email)
+    console.log('Loading:', loading)
+
+    // If user is admin, redirect to admin panel
+    if (user?.is_admin) {
+      console.log('👑 Dashboard: User is admin, redirecting to admin panel')
       router.replace('/admin/leads')
       return
     }
 
-    fetchLeads()
-  }, [user, router, fetchLeads])
+    // If we have a user, fetch leads
+    if (user) {
+      console.log('✅ Dashboard: User authenticated, fetching leads')
+      fetchLeads()
+    }
+  }, [user, loading, router, fetchLeads])
 
   const handleSignOut = async () => {
     await signOut()
     router.push('/')
   }
 
-  if (loading || leadsLoading) {
+  // Show loading only for a short time
+  if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading dashboard...</p>
+        </div>
       </div>
     )
   }
 
+  // Show login prompt if no user after loading is complete
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="mb-4">
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Authentication Required</h2>
+            <p className="text-gray-600">Please log in to access your dashboard.</p>
+          </div>
+          <button 
+            onClick={() => router.push('/login')}
+            className="bg-primary text-white px-6 py-2 rounded-md hover:bg-primary/90 transition-colors"
+          >
+            Go to Login
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  // Show dashboard content even if leads are still loading
   return (
     <div className="min-h-screen bg-gray-50">
       <DashboardNav />
@@ -144,7 +179,7 @@ export default function DashboardPage() {
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.total}</div>
+              <div className="text-2xl font-bold">{leadsLoading ? '...' : stats.total}</div>
             </CardContent>
           </Card>
 
@@ -154,7 +189,7 @@ export default function DashboardPage() {
               <CheckCircle className="h-4 w-4 text-green-600" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-green-600">{stats.approved}</div>
+              <div className="text-2xl font-bold text-green-600">{leadsLoading ? '...' : stats.approved}</div>
             </CardContent>
           </Card>
 
@@ -164,7 +199,7 @@ export default function DashboardPage() {
               <DollarSign className="h-4 w-4 text-green-600" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-green-600">${stats.totalEarnings}</div>
+              <div className="text-2xl font-bold text-green-600">{leadsLoading ? '...' : `$${stats.totalEarnings}`}</div>
             </CardContent>
           </Card>
 
@@ -174,7 +209,7 @@ export default function DashboardPage() {
               <Clock className="h-4 w-4 text-yellow-600" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-yellow-600">${stats.unpaidEarnings}</div>
+              <div className="text-2xl font-bold text-yellow-600">{leadsLoading ? '...' : `$${stats.unpaidEarnings}`}</div>
             </CardContent>
           </Card>
         </div>
@@ -243,7 +278,12 @@ export default function DashboardPage() {
             </div>
           </CardHeader>
           <CardContent>
-            {leads.length === 0 ? (
+            {leadsLoading ? (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                <p className="text-gray-600">Loading leads...</p>
+              </div>
+            ) : leads.length === 0 ? (
               <div className="text-center py-8">
                 <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                 <p className="text-gray-600">No leads submitted yet</p>
@@ -257,7 +297,11 @@ export default function DashboardPage() {
             ) : (
               <div className="space-y-4">
                 {leads.slice(0, 5).map((lead) => (
-                  <div key={lead.id} className="flex items-center justify-between p-4 border rounded-lg">
+                  <div 
+                    key={lead.id} 
+                    className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
+                    onClick={() => setSelectedLead(lead)}
+                  >
                     <div>
                       <h3 className="font-medium">{lead.full_name}</h3>
                       <p className="text-sm text-gray-600">{lead.email}</p>
@@ -280,7 +324,19 @@ export default function DashboardPage() {
             )}
           </CardContent>
         </Card>
+
+        {/* Lead Details Modal */}
+        {selectedLead && (
+          <LeadDetailsModal
+            lead={selectedLead}
+            onClose={() => setSelectedLead(null)}
+            onUpdate={() => {
+              fetchLeads()
+              setSelectedLead(null)
+            }}
+          />
+        )}
       </div>
     </div>
   )
-} 
+}

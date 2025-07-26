@@ -1,20 +1,37 @@
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co'
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-key'
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+// Create a single instance of the Supabase client
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+    flowType: 'pkce',
+    storage: typeof window !== 'undefined' 
+      ? window.localStorage 
+      : undefined,
+    storageKey: 'supabase.auth.token',
+    debug: true
+  },
+  global: {
+    headers: {
+      'X-Client-Info': 'supabase-js-web'
+    }
+  }
+})
 
-// Database types
-export interface User {
+export type User = {
   id: string
   email: string
-  first_name?: string
-  last_name?: string
-  profile_image?: string
+  first_name: string
+  last_name: string
+  profile_image: string
   is_admin: boolean
-  payout_method?: 'paypal' | 'wise' | 'bank_transfer'
-  payout_details?: any
+  payout_method?: string
+  payout_details?: string
   created_at: string
 }
 

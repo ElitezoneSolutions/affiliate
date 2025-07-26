@@ -10,19 +10,20 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
+import { DashboardNav } from '@/components/dashboard-nav'
+import Image from 'next/image'
 import { 
-  ArrowLeft, 
   User, 
   Mail, 
   Lock, 
   Camera, 
-  Save, 
+  Trash2, 
+  LogOut, 
   AlertCircle, 
   CheckCircle,
+  X,
   Eye,
-  EyeOff,
-  Upload,
-  X
+  EyeOff
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -99,21 +100,22 @@ export default function AccountSettingsPage() {
       // Create preview URL
       const url = URL.createObjectURL(file)
       setPreviewUrl(url)
+      setMessage(null)
     }
   }
 
   const removeSelectedFile = () => {
     setSelectedFile(null)
+    setPreviewUrl(null)
     if (previewUrl) {
       URL.revokeObjectURL(previewUrl)
-      setPreviewUrl(null)
     }
   }
 
   const uploadProfileImage = async (file: File): Promise<string> => {
     const fileExt = file.name.split('.').pop()
     const fileName = `${user?.id}-${Date.now()}.${fileExt}`
-    const filePath = `profile-images/${fileName}`
+    const filePath = `${user?.id}/${fileName}`
 
     const { error: uploadError } = await supabase.storage
       .from('avatars')
@@ -141,15 +143,11 @@ export default function AccountSettingsPage() {
       // Upload new image if selected
       if (selectedFile) {
         setUploading(true)
-        try {
-          profileImageUrl = await uploadProfileImage(selectedFile)
-          setUploading(false)
-        } catch (uploadError: any) {
-          setUploading(false)
-          throw new Error(`Failed to upload image: ${uploadError.message}`)
-        }
+        profileImageUrl = await uploadProfileImage(selectedFile)
+        setUploading(false)
       }
 
+      // Update user profile
       const { error } = await supabase
         .from('users')
         .update({
@@ -161,12 +159,16 @@ export default function AccountSettingsPage() {
 
       if (error) throw error
 
-      // Clear file selection after successful update
+      setMessage({ type: 'success', text: 'Profile updated successfully!' })
+      
+      // Clear selected file
       if (selectedFile) {
         removeSelectedFile()
       }
 
-      setMessage({ type: 'success', text: 'Profile updated successfully!' })
+      // Update local state
+      setProfileForm(prev => ({ ...prev, profile_image: profileImageUrl }))
+
     } catch (error: any) {
       setMessage({ type: 'error', text: error.message })
     } finally {
@@ -180,7 +182,7 @@ export default function AccountSettingsPage() {
     setMessage(null)
 
     if (passwordForm.new_password !== passwordForm.confirm_password) {
-      setMessage({ type: 'error', text: 'New passwords do not match' })
+      setMessage({ type: 'error', text: 'Passwords do not match' })
       setLoading(false)
       return
     }
@@ -198,12 +200,13 @@ export default function AccountSettingsPage() {
 
       if (error) throw error
 
-      setMessage({ type: 'success', text: 'Password changed successfully!' })
+      setMessage({ type: 'success', text: 'Password updated successfully!' })
       setPasswordForm({
         current_password: '',
         new_password: '',
         confirm_password: ''
       })
+
     } catch (error: any) {
       setMessage({ type: 'error', text: error.message })
     } finally {
@@ -218,32 +221,39 @@ export default function AccountSettingsPage() {
 
     try {
       const { error } = await supabase.auth.admin.deleteUser(user?.id || '')
-      
       if (error) throw error
 
       await signOut()
-      router.replace('/')
+      router.push('/')
     } catch (error: any) {
-      setMessage({ type: 'error', text: 'Failed to delete account. Please contact support.' })
-    } finally {
+      setMessage({ type: 'error', text: error.message })
       setLoading(false)
     }
   }
 
   const handleSignOut = async () => {
     await signOut()
-    router.replace('/')
+    router.push('/')
+  }
+
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+      </div>
+    )
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-      <div className="max-w-4xl mx-auto">
-        {/* Header */}
-        <div className="flex items-center gap-2 mb-6">
+    <div className="min-h-screen bg-gray-50">
+      <DashboardNav />
+      
+      <div className="max-w-4xl mx-auto px-4 py-8">
+        <div className="flex items-center gap-4 mb-8">
           <Link href="/dashboard" className="text-gray-600 hover:text-gray-900">
-            <ArrowLeft className="h-5 w-5" />
+            <X className="h-5 w-5" />
           </Link>
-          <h1 className="text-3xl font-bold">Account Settings</h1>
+          <h1 className="text-3xl font-bold text-gray-900">Account Settings</h1>
         </div>
 
         {message && (
@@ -275,37 +285,31 @@ export default function AccountSettingsPage() {
               <form onSubmit={handleProfileUpdate} className="space-y-4">
                 <div className="flex items-center gap-4 mb-6">
                   <div className="relative">
-                    <div className="w-20 h-20 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
-                      {previewUrl ? (
-                        <img 
-                          src={previewUrl} 
-                          alt="Profile Preview" 
-                          className="w-full h-full object-cover"
-                        />
-                      ) : profileForm.profile_image ? (
-                        <img 
-                          src={profileForm.profile_image} 
-                          alt="Profile" 
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <User className="h-8 w-8 text-gray-400" />
-                      )}
-                    </div>
                     <label htmlFor="profile-upload" className="cursor-pointer">
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        className="absolute -bottom-1 -right-1 h-6 w-6 p-0"
-                        disabled={uploading}
-                      >
-                        {uploading ? (
-                          <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-gray-600"></div>
+                      <div className="w-20 h-20 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden hover:opacity-80 transition-opacity">
+                        {previewUrl ? (
+                          <Image
+                            src={previewUrl} 
+                            alt="Profile Preview" 
+                            width={80}
+                            height={80}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : profileForm.profile_image ? (
+                          <Image
+                            src={profileForm.profile_image} 
+                            alt="Profile" 
+                            width={80}
+                            height={80}
+                            className="w-full h-full object-cover"
+                          />
                         ) : (
-                          <Camera className="h-3 w-3" />
+                          <User className="h-8 w-8 text-gray-400" />
                         )}
-                      </Button>
+                      </div>
+                      <div className="absolute -bottom-1 -right-1 bg-white rounded-full p-1 shadow-sm">
+                        <Camera className="h-3 w-3 text-gray-600" />
+                      </div>
                     </label>
                     <input
                       id="profile-upload"
@@ -324,6 +328,26 @@ export default function AccountSettingsPage() {
                     </Badge>
                   </div>
                 </div>
+
+                {selectedFile && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 p-3 border rounded-lg bg-gray-50">
+                      <span className="text-sm text-gray-700">{selectedFile.name}</span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={removeSelectedFile}
+                        className="ml-auto h-6 w-6 p-0"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                    <p className="text-xs text-gray-500">
+                      Selected file will be uploaded when you save changes
+                    </p>
+                  </div>
+                )}
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
@@ -360,59 +384,6 @@ export default function AccountSettingsPage() {
                     />
                   </div>
                   <p className="text-xs text-gray-500">Email cannot be changed. Contact support if needed.</p>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Profile Image</Label>
-                  
-                  {selectedFile ? (
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2 p-3 border rounded-lg bg-gray-50">
-                        <Upload className="h-4 w-4 text-gray-500" />
-                        <span className="text-sm text-gray-700">{selectedFile.name}</span>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={removeSelectedFile}
-                          className="ml-auto h-6 w-6 p-0"
-                        >
-                          <X className="h-3 w-3" />
-                        </Button>
-                      </div>
-                      <p className="text-xs text-gray-500">
-                        Selected file will be uploaded when you save changes
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <Input
-                          type="url"
-                          value={profileForm.profile_image}
-                          onChange={(e) => setProfileForm(prev => ({ ...prev, profile_image: e.target.value }))}
-                          placeholder="https://example.com/image.jpg"
-                        />
-                        <span className="text-sm text-gray-500">or</span>
-                        <label htmlFor="profile-upload-url" className="cursor-pointer">
-                          <Button type="button" variant="outline" size="sm">
-                            <Upload className="h-4 w-4 mr-1" />
-                            Upload
-                          </Button>
-                        </label>
-                        <input
-                          id="profile-upload-url"
-                          type="file"
-                          accept="image/*"
-                          onChange={handleFileSelect}
-                          className="hidden"
-                        />
-                      </div>
-                      <p className="text-xs text-gray-500">
-                        Enter a URL or upload an image file (max 5MB)
-                      </p>
-                    </div>
-                  )}
                 </div>
 
                 <Button type="submit" disabled={loading || uploading} className="w-full md:w-auto">
@@ -455,7 +426,7 @@ export default function AccountSettingsPage() {
                       className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
                       onClick={() => setShowNewPassword(!showNewPassword)}
                     >
-                      {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      {showNewPassword ? <X className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </Button>
                   </div>
                 </div>
@@ -480,7 +451,7 @@ export default function AccountSettingsPage() {
                       className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
                       onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                     >
-                      {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      {showConfirmPassword ? <X className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
                     </Button>
                   </div>
                 </div>
@@ -502,90 +473,79 @@ export default function AccountSettingsPage() {
             <CardHeader>
               <CardTitle>Account Actions</CardTitle>
               <CardDescription>
-                Manage your account and session
+                Manage your account settings and security
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex flex-col sm:flex-row gap-4">
-                <Button 
-                  variant="outline" 
-                  onClick={handleSignOut}
-                  className="flex-1"
-                >
-                  Sign Out
+              <div className="flex items-center justify-between p-4 border rounded-lg">
+                <div>
+                  <h3 className="font-medium">Sign Out</h3>
+                  <p className="text-sm text-gray-600">Sign out of your account</p>
+                </div>
+                <Button variant="outline" onClick={handleSignOut}>
+                  <LogOut className="h-4 w-4 mr-2" /> Sign Out
                 </Button>
-                
+              </div>
+
+              <div className="flex items-center justify-between p-4 border rounded-lg bg-red-50">
+                <div>
+                  <h3 className="font-medium text-red-900">Delete Account</h3>
+                  <p className="text-sm text-red-700">Permanently delete your account and all data</p>
+                </div>
                 <Button 
                   variant="destructive" 
                   onClick={() => setShowDeleteConfirm(true)}
-                  className="flex-1"
                 >
                   Delete Account
                 </Button>
               </div>
-
-              {showDeleteConfirm && (
-                <Card className="border-red-200 bg-red-50">
-                  <CardHeader>
-                    <CardTitle className="text-red-800">Confirm Account Deletion</CardTitle>
-                    <CardDescription className="text-red-700">
-                      This action cannot be undone. All your data will be permanently deleted.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <form onSubmit={handleAccountDeletion} className="space-y-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="delete_password">Enter your password to confirm</Label>
-                        <div className="relative">
-                          <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                          <Input
-                            id="delete_password"
-                            type={showPassword ? 'text' : 'password'}
-                            value={deletePassword}
-                            onChange={(e) => setDeletePassword(e.target.value)}
-                            placeholder="Enter your password"
-                            className="pl-10 pr-10"
-                            required
-                          />
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                            onClick={() => setShowPassword(!showPassword)}
-                          >
-                            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                          </Button>
-                        </div>
-                      </div>
-                      
-                      <div className="flex gap-2">
-                        <Button 
-                          type="submit" 
-                          variant="destructive" 
-                          disabled={loading || !deletePassword}
-                        >
-                          {loading ? 'Deleting...' : 'Permanently Delete Account'}
-                        </Button>
-                        <Button 
-                          type="button" 
-                          variant="outline" 
-                          onClick={() => {
-                            setShowDeleteConfirm(false)
-                            setDeletePassword('')
-                          }}
-                        >
-                          Cancel
-                        </Button>
-                      </div>
-                    </form>
-                  </CardContent>
-                </Card>
-              )}
             </CardContent>
           </Card>
         </div>
       </div>
+
+      {/* Delete Account Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 className="text-lg font-semibold text-red-900 mb-4">Delete Account</h3>
+            <p className="text-gray-600 mb-4">
+              This action cannot be undone. All your data will be permanently deleted.
+            </p>
+            <form onSubmit={handleAccountDeletion} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="delete-password">Enter your password to confirm</Label>
+                <Input
+                  id="delete-password"
+                  type="password"
+                  value={deletePassword}
+                  onChange={(e) => setDeletePassword(e.target.value)}
+                  placeholder="Enter your password"
+                  required
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="flex-1"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  variant="destructive"
+                  disabled={loading}
+                  className="flex-1"
+                >
+                  {loading ? 'Deleting...' : 'Delete Account'}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 } 
