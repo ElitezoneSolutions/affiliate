@@ -1021,9 +1021,6 @@ video {
 .border {
   border-width: 1px;
 }
-.border-2 {
-  border-width: 2px;
-}
 .border-b {
   border-bottom-width: 1px;
 }
@@ -1035,9 +1032,6 @@ video {
 }
 .border-t {
   border-top-width: 1px;
-}
-.border-dashed {
-  border-style: dashed;
 }
 .border-blue-200 {
   --tw-border-opacity: 1;
