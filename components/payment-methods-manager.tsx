@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase, PaymentMethod } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -49,11 +49,7 @@ export function PaymentMethodsManager({ userId, onUpdate }: PaymentMethodsManage
     bank_account_name: ''
   })
 
-  useEffect(() => {
-    fetchPaymentMethods()
-  }, [userId])
-
-  const fetchPaymentMethods = async () => {
+  const fetchPaymentMethods = useCallback(async () => {
     try {
       setLoading(true)
       setError('')
@@ -73,7 +69,11 @@ export function PaymentMethodsManager({ userId, onUpdate }: PaymentMethodsManage
     } finally {
       setLoading(false)
     }
-  }
+  }, [userId])
+
+  useEffect(() => {
+    fetchPaymentMethods()
+  }, [fetchPaymentMethods])
 
   const resetForm = () => {
     setFormData({

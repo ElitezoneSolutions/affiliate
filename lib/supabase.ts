@@ -52,7 +52,7 @@ export type Lead = {
   program: string
   lead_note?: string
   status: 'pending' | 'approved' | 'rejected'
-  price?: number
+  price?: number | null
   paid: boolean
   call_requested: boolean
   call_meeting_link?: string

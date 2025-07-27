@@ -396,7 +396,7 @@ export default function UserDetailsPage() {
               <Card>
                 <CardHeader>
                   <CardTitle>Payment Methods</CardTitle>
-                  <CardDescription>User's configured payment methods</CardDescription>
+                  <CardDescription>User&apos;s configured payment methods</CardDescription>
                 </CardHeader>
                 <CardContent>
                   {userDetails.payout_methods && userDetails.payout_methods.length > 0 ? (

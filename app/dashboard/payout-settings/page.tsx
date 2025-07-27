@@ -51,6 +51,20 @@ export default function PayoutSettingsPage() {
     )
   }
 
+  // Check if user exists
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <DashboardNav />
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="text-center">
+            <p className="text-gray-600">Loading user data...</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <DashboardNav />
@@ -132,7 +146,7 @@ export default function PayoutSettingsPage() {
         </Card>
 
         {/* Payment Methods Manager */}
-        <PaymentMethodsManager userId={user?.id || ''} onUpdate={handleUpdate} />
+        <PaymentMethodsManager userId={user.id} onUpdate={handleUpdate} />
       </div>
     </div>
   )

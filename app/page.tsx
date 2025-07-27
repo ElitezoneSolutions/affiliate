@@ -3,10 +3,12 @@
 import { useAuth } from '@/components/providers'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { ArrowRight, TrendingUp, Users, DollarSign, Shield } from 'lucide-react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect } from 'react'
-import { ArrowRight } from 'lucide-react'
-import DatabaseStatus from '@/components/database-status'
+import { DatabaseStatus } from '@/components/database-status'
 
 export default function HomePage() {
   const { user, loading } = useAuth()
