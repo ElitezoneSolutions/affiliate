@@ -20,7 +20,10 @@ import {
   LogOut,
   AlertCircle,
   ArrowLeft,
-  Eye
+  Eye,
+  User,
+  Mail,
+  Building
 } from 'lucide-react'
 import Link from 'next/link'
 import { AdminLayout } from '@/components/admin-layout'
@@ -30,7 +33,7 @@ interface PayoutRequest {
   affiliate_id: string
   amount: number
   method: string
-  details: any
+  payment_details: any
   status: 'requested' | 'approved' | 'rejected'
   note?: string
   created_at: string
@@ -134,7 +137,8 @@ export default function AdminPayoutsPage() {
         .from('payout_requests')
         .update({
           status: status,
-          note: processingNote || undefined
+          note: processingNote || undefined,
+          processed_at: new Date().toISOString()
         })
         .eq('id', payoutId)
 
@@ -181,7 +185,8 @@ export default function AdminPayoutsPage() {
         payout.id === payoutId ? {
           ...payout,
           status: status,
-          note: processingNote || undefined
+          note: processingNote || undefined,
+          processed_at: new Date().toISOString()
         } : payout
       ))
 
@@ -236,6 +241,89 @@ export default function AdminPayoutsPage() {
     }
   }
 
+  const getMethodIcon = (method: string) => {
+    switch (method) {
+      case 'paypal': return '💳'
+      case 'wise': return '🌍'
+      case 'bank_transfer': return '🏦'
+      default: return <CreditCard className="h-4 w-4" />
+    }
+  }
+
+  const renderPaymentDetails = (payout: PayoutRequest) => {
+    if (!payout.payment_details) {
+      return <span className="text-gray-500">No payment details available</span>
+    }
+
+    const details = payout.payment_details
+    const method = payout.method
+
+    switch (method) {
+      case 'paypal':
+        return (
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <Mail className="h-4 w-4 text-gray-500" />
+              <span className="font-medium">PayPal Email:</span>
+              <span>{details.paypal?.email || 'Not provided'}</span>
+            </div>
+          </div>
+        )
+      
+      case 'wise':
+        return (
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <User className="h-4 w-4 text-gray-500" />
+              <span className="font-medium">Name:</span>
+              <span>{details.wise?.name || 'Not provided'}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Mail className="h-4 w-4 text-gray-500" />
+              <span className="font-medium">Email:</span>
+              <span>{details.wise?.email || 'Not provided'}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Building className="h-4 w-4 text-gray-500" />
+              <span className="font-medium">Account ID:</span>
+              <span>{details.wise?.account_id || 'Not provided'}</span>
+            </div>
+          </div>
+        )
+      
+      case 'bank_transfer':
+        return (
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <User className="h-4 w-4 text-gray-500" />
+              <span className="font-medium">Account Holder:</span>
+              <span>{details.bank_transfer?.name || 'Not provided'}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Building className="h-4 w-4 text-gray-500" />
+              <span className="font-medium">Bank:</span>
+              <span>{details.bank_transfer?.bank_name || 'Not provided'}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <CreditCard className="h-4 w-4 text-gray-500" />
+              <span className="font-medium">IBAN:</span>
+              <span className="font-mono text-sm">{details.bank_transfer?.iban || 'Not provided'}</span>
+            </div>
+            {details.bank_transfer?.swift && (
+              <div className="flex items-center gap-2">
+                <Building className="h-4 w-4 text-gray-500" />
+                <span className="font-medium">SWIFT:</span>
+                <span className="font-mono text-sm">{details.bank_transfer.swift}</span>
+              </div>
+            )}
+          </div>
+        )
+      
+      default:
+        return <span className="text-gray-500">Unknown payment method</span>
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -287,51 +375,45 @@ export default function AdminPayoutsPage() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Amount</CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">Approved</CardTitle>
+              <CheckCircle className="h-4 w-4 text-green-600" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">
-                ${payouts.reduce((sum, p) => sum + p.amount, 0)}
+              <div className="text-2xl font-bold text-green-600">
+                {payouts.filter(p => p.status === 'approved').length}
               </div>
-              <p className="text-xs text-muted-foreground">All requests</p>
+              <p className="text-xs text-muted-foreground">Successfully processed</p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Pending Amount</CardTitle>
+              <CardTitle className="text-sm font-medium">Total Amount</CardTitle>
               <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                ${payouts.filter(p => p.status === 'requested').reduce((sum, p) => sum + p.amount, 0)}
+                ${payouts.reduce((sum, p) => sum + p.amount, 0).toFixed(2)}
               </div>
-              <p className="text-xs text-muted-foreground">To be processed</p>
+              <p className="text-xs text-muted-foreground">All time payouts</p>
             </CardContent>
           </Card>
         </div>
 
         {/* Filters */}
         <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Filter className="h-5 w-5" />
-              Filters
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
+          <CardContent className="p-6">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium">Search</label>
                 <div className="relative">
-                  <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <input
                     type="text"
-                    placeholder="Search by user name or email..."
+                    placeholder="Search by name or email..."
                     value={filters.search}
                     onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
-                    className="w-full pl-10 p-2 border border-gray-300 rounded-md"
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                 </div>
               </div>
@@ -343,7 +425,7 @@ export default function AdminPayoutsPage() {
                   onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
                   className="w-full p-2 border border-gray-300 rounded-md"
                 >
-                  <option value="all">All Status</option>
+                  <option value="all">All Statuses</option>
                   <option value="requested">Pending</option>
                   <option value="approved">Approved</option>
                   <option value="rejected">Rejected</option>
@@ -382,9 +464,9 @@ export default function AdminPayoutsPage() {
                 <p className="text-gray-600">No payout requests found</p>
               </div>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-6">
                 {filteredPayouts.map((payout) => (
-                  <div key={payout.id} className="border rounded-lg p-4">
+                  <div key={payout.id} className="border rounded-lg p-6">
                     <div className="flex items-center justify-between mb-4">
                       <div className="flex items-center gap-3">
                         {getStatusIcon(payout.status)}
@@ -401,15 +483,22 @@ export default function AdminPayoutsPage() {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-600 mb-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
                       <div>
-                        <span className="font-medium">Method:</span> {getMethodLabel(payout.method)}
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-lg">{getMethodIcon(payout.method)}</span>
+                          <span className="font-medium">{getMethodLabel(payout.method)}</span>
+                        </div>
+                        <div className="text-sm text-gray-600">
+                          Requested: {formatDate(payout.created_at)}
+                        </div>
                       </div>
+                      
                       <div>
-                        <span className="font-medium">Requested:</span> {formatDate(payout.created_at)}
-                      </div>
-                      <div>
-                        <span className="font-medium">Details:</span> {JSON.stringify(payout.details)}
+                        <div className="font-medium text-sm mb-2">Payment Details:</div>
+                        <div className="text-sm">
+                          {renderPaymentDetails(payout)}
+                        </div>
                       </div>
                     </div>
 

@@ -82,8 +82,8 @@ CREATE TABLE users (
   profile_image TEXT,
   is_admin BOOLEAN DEFAULT false,
   is_suspended BOOLEAN DEFAULT false,
-  payout_method TEXT CHECK (payout_method IN ('paypal', 'wise', 'bank_transfer')),
-  payout_details JSONB,
+  default_payout_method TEXT CHECK (default_payout_method IN ('paypal', 'wise', 'bank_transfer')),
+  payout_methods JSONB DEFAULT '[]'::jsonb,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -115,7 +115,7 @@ CREATE TABLE payout_requests (
   affiliate_id UUID REFERENCES users(id) ON DELETE CASCADE NOT NULL,
   amount DECIMAL(10,2) NOT NULL CHECK (amount > 0),
   method TEXT NOT NULL,
-  details JSONB,
+  payment_details JSONB,
   status TEXT DEFAULT 'requested' CHECK (status IN ('requested', 'approved', 'rejected')),
   note TEXT,
   processed_at TIMESTAMP WITH TIME ZONE,
@@ -489,6 +489,8 @@ WHERE id IN ('avatars', 'documents');
 -- ✅ File upload support for avatars and documents
 -- ✅ Complete payout system ready
 -- ✅ FIXED: No more column errors or recursion issues
+-- ✅ NEW: Multiple payment methods support
+-- ✅ NEW: Improved payout details structure
 
 -- Next steps:
 -- 1. Configure Authentication settings in Supabase dashboard
@@ -498,4 +500,5 @@ WHERE id IN ('avatars', 'documents');
 -- 5. Create a user account at http://localhost:3000/signup
 -- 6. Make yourself admin by running: UPDATE users SET is_admin = true WHERE email = 'your-email@example.com';
 -- 7. Test admin dashboard at http://localhost:3000/admin/leads
--- 8. Test user suspension features in admin panel 
+-- 8. Test user suspension features in admin panel
+-- 9. Test multiple payment methods in user dashboard 

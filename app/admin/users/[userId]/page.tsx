@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '@/components/providers'
 import { useRouter, useParams } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
+import { supabase, PaymentMethod } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -29,7 +29,8 @@ import {
   Ban,
   Shield,
   Save,
-  Trash2
+  Trash2,
+  Star
 } from 'lucide-react'
 import Link from 'next/link'
 import { AdminLayout } from '@/components/admin-layout'
@@ -44,8 +45,8 @@ interface UserDetails {
   is_suspended: boolean
   created_at: string
   profile_image?: string
-  payout_method?: string
-  payout_details?: any
+  default_payout_method?: string
+  payout_methods?: PaymentMethod[]
 }
 
 interface UserStats {
@@ -66,9 +67,8 @@ interface RecentLead {
   email: string
   program: string
   status: string
-  price: number
+  price?: number
   created_at: string
-  paid: boolean
 }
 
 export default function UserDetailsPage() {
@@ -87,9 +87,7 @@ export default function UserDetailsPage() {
     last_name: '',
     email: '',
     is_admin: false,
-    is_suspended: false,
-    payout_method: '',
-    payout_details: ''
+    is_suspended: false
   })
   const [userStats, setUserStats] = useState<UserStats>({
     total_leads: 0,
@@ -122,9 +120,7 @@ export default function UserDetailsPage() {
         last_name: user.last_name || '',
         email: user.email || '',
         is_admin: user.is_admin || false,
-        is_suspended: user.is_suspended || false,
-        payout_method: user.payout_method || '',
-        payout_details: user.payout_details || ''
+        is_suspended: user.is_suspended || false
       })
 
       // Fetch user's leads
@@ -201,9 +197,7 @@ export default function UserDetailsPage() {
           last_name: editForm.last_name,
           email: editForm.email,
           is_admin: editForm.is_admin,
-          is_suspended: editForm.is_suspended,
-          payout_method: editForm.payout_method,
-          payout_details: editForm.payout_details
+          is_suspended: editForm.is_suspended
         })
         .eq('id', userId)
 
@@ -218,49 +212,42 @@ export default function UserDetailsPage() {
     }
   }
 
-  const handleDelete = async () => {
-    if (!window.confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
-      return
-    }
-
-    try {
-      setSaving(true)
-      setError('')
-
-      const { error } = await supabase
-        .from('users')
-        .delete()
-        .eq('id', userId)
-
-      if (error) throw error
-
-      router.replace('/admin/users')
-    } catch (error: any) {
-      setError(error.message)
-      setSaving(false)
-    }
-  }
-
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+      day: 'numeric'
     })
   }
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'approved':
-        return <Badge variant="default" className="bg-green-100 text-green-800">Approved</Badge>
-      case 'pending':
-        return <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">Pending</Badge>
-      case 'rejected':
-        return <Badge variant="destructive">Rejected</Badge>
+  const getMethodIcon = (type: string) => {
+    switch (type) {
+      case 'paypal': return '💳'
+      case 'wise': return '🌍'
+      case 'bank_transfer': return '🏦'
+      default: return <CreditCard className="h-4 w-4" />
+    }
+  }
+
+  const getMethodLabel = (type: string) => {
+    switch (type) {
+      case 'paypal': return 'PayPal'
+      case 'wise': return 'Wise'
+      case 'bank_transfer': return 'Bank Transfer'
+      default: return type
+    }
+  }
+
+  const renderPaymentMethodDetails = (method: PaymentMethod) => {
+    switch (method.type) {
+      case 'paypal':
+        return <span className="text-sm text-gray-600">{method.details.paypal?.email || 'Email not provided'}</span>
+      case 'wise':
+        return <span className="text-sm text-gray-600">{method.details.wise?.name || 'Name not provided'} ({method.details.wise?.email || 'Email not provided'})</span>
+      case 'bank_transfer':
+        return <span className="text-sm text-gray-600">{method.details.bank_transfer?.bank_name || 'Bank not provided'} - {method.details.bank_transfer?.iban?.slice(-4) || 'IBAN not provided'}</span>
       default:
-        return <Badge variant="outline">{status}</Badge>
+        return <span className="text-sm text-gray-600">Unknown payment method</span>
     }
   }
 
@@ -272,12 +259,10 @@ export default function UserDetailsPage() {
     return (
       <AdminLayout>
         <div className="p-6">
-          <div className="max-w-7xl mx-auto">
-            <Alert variant="destructive">
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>User not found</AlertDescription>
-            </Alert>
-          </div>
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>User not found</AlertDescription>
+          </Alert>
         </div>
       </AdminLayout>
     )
@@ -288,19 +273,42 @@ export default function UserDetailsPage() {
       <div className="p-6">
         <div className="max-w-7xl mx-auto">
           {/* Header */}
-          <div className="mb-8">
-            <div className="flex items-center gap-4 mb-4">
-              <Link href="/admin/users">
-                <Button variant="outline" size="sm">
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Back to Users
-                </Button>
-              </Link>
+          <div className="mb-6">
+            <Link href="/admin/users" className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900 mb-4">
+              <ArrowLeft className="h-4 w-4 mr-1" />
+              Back to Users
+            </Link>
+            <div className="flex items-center gap-4">
+              {userDetails.profile_image && (
+                <Image
+                  src={userDetails.profile_image}
+                  alt="Profile"
+                  width={64}
+                  height={64}
+                  className="rounded-full"
+                />
+              )}
+              <div>
+                <h1 className="text-3xl font-bold text-gray-900">
+                  {userDetails.first_name} {userDetails.last_name}
+                </h1>
+                <p className="text-gray-600">{userDetails.email}</p>
+                <div className="flex items-center gap-2 mt-2">
+                  {userDetails.is_admin && (
+                    <Badge className="bg-purple-100 text-purple-800">
+                      <Shield className="h-3 w-3 mr-1" />
+                      Admin
+                    </Badge>
+                  )}
+                  {userDetails.is_suspended && (
+                    <Badge variant="destructive">
+                      <Ban className="h-3 w-3 mr-1" />
+                      Suspended
+                    </Badge>
+                  )}
+                </div>
+              </div>
             </div>
-            <h1 className="text-3xl font-bold text-gray-900">
-              {userDetails.first_name} {userDetails.last_name}
-            </h1>
-            <p className="text-gray-600">User Details & Performance</p>
           </div>
 
           {error && (
@@ -311,66 +319,36 @@ export default function UserDetailsPage() {
           )}
 
           {success && (
-            <Alert className="mb-6 bg-green-50 text-green-800 border-green-200">
-              <CheckCircle className="h-4 w-4" />
-              <AlertDescription>{success}</AlertDescription>
+            <Alert className="border-green-200 bg-green-50 mb-6">
+              <CheckCircle className="h-4 w-4 text-green-600" />
+              <AlertDescription className="text-green-800">{success}</AlertDescription>
             </Alert>
           )}
 
-          {/* User Profile */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-            <Card className="lg:col-span-1">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <User className="h-5 w-5" />
-                  Profile Information
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center overflow-hidden">
-                    {userDetails.profile_image ? (
-                      <Image 
-                        src={userDetails.profile_image} 
-                        alt="Profile" 
-                        width={64}
-                        height={64}
-                        className="w-16 h-16 rounded-full object-cover"
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* User Details */}
+            <div className="lg:col-span-2 space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>User Information</CardTitle>
+                  <CardDescription>Edit user details and permissions</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-sm font-medium">First Name</label>
+                      <Input
+                        value={editForm.first_name}
+                        onChange={(e) => setEditForm(prev => ({ ...prev, first_name: e.target.value }))}
                       />
-                    ) : (
-                      <User className="h-8 w-8 text-gray-500" />
-                    )}
-                  </div>
-                  <div>
-                    <div className="font-medium">
-                      {userDetails.first_name} {userDetails.last_name}
                     </div>
-                    <div className="flex gap-2">
-                      <Badge variant={userDetails.is_admin ? "default" : "secondary"}>
-                        {userDetails.is_admin ? 'Admin' : 'Affiliate'}
-                      </Badge>
-                      {userDetails.is_suspended && (
-                        <Badge variant="destructive">Suspended</Badge>
-                      )}
+                    <div>
+                      <label className="text-sm font-medium">Last Name</label>
+                      <Input
+                        value={editForm.last_name}
+                        onChange={(e) => setEditForm(prev => ({ ...prev, last_name: e.target.value }))}
+                      />
                     </div>
-                  </div>
-                </div>
-                
-                <div className="space-y-4">
-                  <div>
-                    <label className="text-sm font-medium">First Name</label>
-                    <Input
-                      value={editForm.first_name}
-                      onChange={(e) => setEditForm(prev => ({ ...prev, first_name: e.target.value }))}
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="text-sm font-medium">Last Name</label>
-                    <Input
-                      value={editForm.last_name}
-                      onChange={(e) => setEditForm(prev => ({ ...prev, last_name: e.target.value }))}
-                    />
                   </div>
 
                   <div>
@@ -378,32 +356,6 @@ export default function UserDetailsPage() {
                     <Input
                       value={editForm.email}
                       onChange={(e) => setEditForm(prev => ({ ...prev, email: e.target.value }))}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-sm font-medium">Payout Method</label>
-                    <Select 
-                      value={editForm.payout_method} 
-                      onValueChange={(value) => setEditForm(prev => ({ ...prev, payout_method: value }))}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select payout method" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="paypal">PayPal</SelectItem>
-                        <SelectItem value="wise">Wise</SelectItem>
-                        <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div>
-                    <label className="text-sm font-medium">Payout Details</label>
-                    <Textarea
-                      value={editForm.payout_details}
-                      onChange={(e) => setEditForm(prev => ({ ...prev, payout_details: e.target.value }))}
-                      rows={3}
                     />
                   </div>
 
@@ -433,138 +385,172 @@ export default function UserDetailsPage() {
                     </label>
                   </div>
 
-                  <div className="flex gap-2 pt-4">
-                    <Button onClick={handleSave} disabled={saving}>
-                      <Save className="h-4 w-4 mr-2" />
-                      Save Changes
-                    </Button>
-                    <Button variant="destructive" onClick={handleDelete} disabled={saving}>
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Delete User
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Statistics */}
-            <Card className="lg:col-span-2">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <TrendingUp className="h-5 w-5" />
-                  Performance Statistics
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="text-center p-4 bg-blue-50 rounded-lg">
-                    <div className="text-2xl font-bold text-blue-600">{userStats.total_leads}</div>
-                    <div className="text-sm text-gray-600">Total Leads</div>
-                  </div>
-                  <div className="text-center p-4 bg-green-50 rounded-lg">
-                    <div className="text-2xl font-bold text-green-600">{userStats.approved_leads}</div>
-                    <div className="text-sm text-gray-600">Approved</div>
-                  </div>
-                  <div className="text-center p-4 bg-yellow-50 rounded-lg">
-                    <div className="text-2xl font-bold text-yellow-600">{userStats.pending_leads}</div>
-                    <div className="text-sm text-gray-600">Pending</div>
-                  </div>
-                  <div className="text-center p-4 bg-red-50 rounded-lg">
-                    <div className="text-2xl font-bold text-red-600">{userStats.rejected_leads}</div>
-                    <div className="text-sm text-gray-600">Rejected</div>
-                  </div>
-                </div>
-                
-                <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="text-center p-4 bg-green-50 rounded-lg">
-                    <div className="text-2xl font-bold text-green-600">${userStats.total_earnings}</div>
-                    <div className="text-sm text-gray-600">Total Earnings</div>
-                  </div>
-                  <div className="text-center p-4 bg-blue-50 rounded-lg">
-                    <div className="text-2xl font-bold text-blue-600">${userStats.paid_earnings}</div>
-                    <div className="text-sm text-gray-600">Paid</div>
-                  </div>
-                  <div className="text-center p-4 bg-orange-50 rounded-lg">
-                    <div className="text-2xl font-bold text-orange-600">${userStats.unpaid_earnings}</div>
-                    <div className="text-sm text-gray-600">Unpaid</div>
-                  </div>
-                </div>
-
-                <div className="mt-6">
-                  <div className="text-sm text-gray-600 mb-2">Activity Timeline</div>
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2 text-sm">
-                      <Calendar className="h-4 w-4 text-gray-500" />
-                      <span>Joined {formatDate(userDetails.created_at)}</span>
-                    </div>
-                    {userStats.last_lead_date && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <Clock className="h-4 w-4 text-gray-500" />
-                        <span>Last Lead: {formatDate(userStats.last_lead_date)}</span>
-                      </div>
-                    )}
-                    <div className="flex items-center gap-2 text-sm">
-                      <CreditCard className="h-4 w-4 text-gray-500" />
-                      <span>Payout Requests: {userStats.payout_requests}</span>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Recent Leads */}
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="flex items-center gap-2">
-                    <FileText className="h-5 w-5" />
-                    Recent Leads
-                  </CardTitle>
-                  <CardDescription>
-                    Latest leads submitted by this user
-                  </CardDescription>
-                </div>
-                <Link href={`/admin/users/${userId}/leads`}>
-                  <Button variant="outline" size="sm">
-                    View All Leads
+                  <Button onClick={handleSave} disabled={saving} className="flex items-center gap-2">
+                    <Save className="h-4 w-4" />
+                    {saving ? 'Saving...' : 'Save Changes'}
                   </Button>
-                </Link>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {recentLeads.length === 0 ? (
-                <div className="text-center py-8">
-                  <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-600">No leads submitted yet</p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {recentLeads.map((lead) => (
-                    <div key={lead.id} className="flex items-center justify-between p-4 border rounded-lg">
-                      <div>
-                        <div className="font-medium">{lead.full_name}</div>
-                        <div className="text-sm text-gray-600">{lead.program}</div>
-                        <div className="text-xs text-gray-500">{formatDate(lead.created_at)}</div>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <div className="text-right">
-                          <div className="font-medium">${lead.price || 0}</div>
-                          {getStatusBadge(lead.status)}
+                </CardContent>
+              </Card>
+
+              {/* Payment Methods */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Payment Methods</CardTitle>
+                  <CardDescription>User's configured payment methods</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {userDetails.payout_methods && userDetails.payout_methods.length > 0 ? (
+                    <div className="space-y-4">
+                      {userDetails.payout_methods.map((method) => (
+                        <div key={method.id} className="border rounded-lg p-4">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-3">
+                              <div className="text-2xl">{getMethodIcon(method.type)}</div>
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <h4 className="font-medium">{method.name}</h4>
+                                  {method.is_default && (
+                                    <Badge className="bg-blue-100 text-blue-800">
+                                      <Star className="h-3 w-3 mr-1" />
+                                      Default
+                                    </Badge>
+                                  )}
+                                </div>
+                                <div className="text-sm text-gray-500">{getMethodLabel(method.type)}</div>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="text-sm">
+                            {renderPaymentMethodDetails(method)}
+                          </div>
                         </div>
-                        {lead.paid && (
-                          <Badge variant="default" className="bg-green-100 text-green-800">
-                            Paid
-                          </Badge>
-                        )}
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <CreditCard className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                      <p className="text-gray-600">No payment methods configured</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Recent Leads */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Recent Leads</CardTitle>
+                  <CardDescription>Latest lead submissions from this user</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {recentLeads.length > 0 ? (
+                    <div className="space-y-4">
+                      {recentLeads.map((lead) => (
+                        <div key={lead.id} className="flex items-center justify-between p-3 border rounded-lg">
+                          <div>
+                            <div className="font-medium">{lead.full_name}</div>
+                            <div className="text-sm text-gray-600">{lead.email}</div>
+                            <div className="text-sm text-gray-600">{lead.program}</div>
+                          </div>
+                          <div className="text-right">
+                            <Badge variant={
+                              lead.status === 'approved' ? 'default' :
+                              lead.status === 'rejected' ? 'destructive' : 'secondary'
+                            }>
+                              {lead.status}
+                            </Badge>
+                            {lead.price && (
+                              <div className="text-sm text-green-600 font-medium mt-1">${lead.price}</div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                      <p className="text-gray-600">No leads submitted yet</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Sidebar */}
+            <div className="space-y-6">
+              {/* Statistics */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Statistics</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="text-center p-3 bg-blue-50 rounded-lg">
+                      <div className="text-2xl font-bold text-blue-600">{userStats.total_leads}</div>
+                      <div className="text-sm text-gray-600">Total Leads</div>
+                    </div>
+                    <div className="text-center p-3 bg-green-50 rounded-lg">
+                      <div className="text-2xl font-bold text-green-600">{userStats.approved_leads}</div>
+                      <div className="text-sm text-gray-600">Approved</div>
+                    </div>
+                  </div>
+                  
+                  <div className="mt-6 grid grid-cols-1 gap-4">
+                    <div className="text-center p-4 bg-green-50 rounded-lg">
+                      <div className="text-2xl font-bold text-green-600">${userStats.total_earnings}</div>
+                      <div className="text-sm text-gray-600">Total Earnings</div>
+                    </div>
+                    <div className="text-center p-4 bg-blue-50 rounded-lg">
+                      <div className="text-2xl font-bold text-blue-600">${userStats.paid_earnings}</div>
+                      <div className="text-sm text-gray-600">Paid</div>
+                    </div>
+                    <div className="text-center p-4 bg-orange-50 rounded-lg">
+                      <div className="text-2xl font-bold text-orange-600">${userStats.unpaid_earnings}</div>
+                      <div className="text-sm text-gray-600">Unpaid</div>
+                    </div>
+                  </div>
+
+                  <div className="mt-6">
+                    <div className="text-sm text-gray-600 mb-2">Activity Timeline</div>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-sm">
+                        <Calendar className="h-4 w-4 text-gray-500" />
+                        <span>Joined {formatDate(userDetails.created_at)}</span>
+                      </div>
+                      {userStats.last_lead_date && (
+                        <div className="flex items-center gap-2 text-sm">
+                          <Clock className="h-4 w-4 text-gray-500" />
+                          <span>Last Lead: {formatDate(userStats.last_lead_date)}</span>
+                        </div>
+                      )}
+                      <div className="flex items-center gap-2 text-sm">
+                        <CreditCard className="h-4 w-4 text-gray-500" />
+                        <span>Payout Requests: {userStats.payout_requests}</span>
                       </div>
                     </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Quick Actions */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Quick Actions</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <Link href={`/admin/users/${userId}/leads`}>
+                    <Button variant="outline" className="w-full justify-start">
+                      <FileText className="h-4 w-4 mr-2" />
+                      View All Leads
+                    </Button>
+                  </Link>
+                  <Button variant="outline" className="w-full justify-start">
+                    <Mail className="h-4 w-4 mr-2" />
+                    Send Message
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
         </div>
       </div>
     </AdminLayout>

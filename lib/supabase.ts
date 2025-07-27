@@ -3,25 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
-// Create a single instance of the Supabase client
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-    detectSessionInUrl: true,
-    flowType: 'pkce',
-    storage: typeof window !== 'undefined' 
-      ? window.localStorage 
-      : undefined,
-    storageKey: 'supabase.auth.token',
-    debug: true
-  },
-  global: {
-    headers: {
-      'X-Client-Info': 'supabase-js-web'
-    }
-  }
-})
+export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 export type User = {
   id: string
@@ -31,28 +13,53 @@ export type User = {
   profile_image: string
   is_admin: boolean
   is_suspended?: boolean
-  payout_method?: string
-  payout_details?: any
+  default_payout_method?: string
+  payout_methods?: PaymentMethod[]
   created_at: string
 }
 
-export interface Lead {
+export type PaymentMethod = {
+  id: string
+  type: 'paypal' | 'wise' | 'bank_transfer'
+  name: string
+  is_default: boolean
+  details: {
+    paypal?: {
+      email: string
+    }
+    wise?: {
+      name: string
+      email: string
+      account_id: string
+    }
+    bank_transfer?: {
+      name: string
+      iban: string
+      bank_name: string
+      swift: string
+    }
+  }
+  created_at: string
+}
+
+export type Lead = {
   id: string
   affiliate_id: string
   full_name: string
   email: string
-  phone: string
-  website: string
+  phone?: string
+  website?: string
   program: string
-  lead_note: string
+  lead_note?: string
   status: 'pending' | 'approved' | 'rejected'
-  price?: number | null
+  price?: number
   paid: boolean
   call_requested: boolean
   call_meeting_link?: string
   admin_note?: string
   payout_request_id?: string
   created_at: string
+  updated_at: string
 }
 
 export interface PayoutRequest {
@@ -60,7 +67,7 @@ export interface PayoutRequest {
   affiliate_id: string
   amount: number
   method: string
-  details: any
+  payment_details: any
   status: 'requested' | 'approved' | 'rejected'
   note?: string
   created_at: string

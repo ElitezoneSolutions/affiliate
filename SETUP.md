@@ -12,6 +12,7 @@ A comprehensive affiliate management system built with Next.js 14, TypeScript, S
 - [Environment Variables](#-environment-variables)
 - [Running the Application](#-running-the-application)
 - [Admin Setup](#-admin-setup)
+- [Payment Methods](#-payment-methods)
 - [Troubleshooting](#-troubleshooting)
 
 ## ✨ Features
@@ -27,15 +28,24 @@ A comprehensive affiliate management system built with Next.js 14, TypeScript, S
 - **Lead Submission** with detailed forms
 - **Lead Tracking** with status updates
 - **Earnings Calculator** with real-time stats
-- **Payout Requests** with multiple payment methods
+- **Multiple Payment Methods** with management interface
+- **Payout Requests** with detailed payment information
 - **Performance Analytics** and reporting
 
 ### 👨‍💼 Admin Panel
 - **User Management** with suspension controls
 - **Lead Management** with approval/rejection
-- **Payout Processing** with status tracking
+- **Payout Processing** with detailed payment information
+- **Payment Method Overview** for each user
 - **Analytics Dashboard** with comprehensive stats
 - **System Settings** and configuration
+
+### 💳 Payment Methods
+- **Multiple Payment Methods** per user (PayPal, Wise, Bank Transfer)
+- **Payment Method Management** with add/edit/delete
+- **Default Payment Method** selection
+- **Detailed Payment Information** display in admin panel
+- **Secure Payment Details** storage
 
 ### 🛡️ Security Features
 - **Row Level Security (RLS)** on all tables
@@ -114,12 +124,26 @@ Visit `http://localhost:3000` to see your application!
 3. **Paste and run** the script
 4. **Verify setup** by checking the verification queries at the end
 
+### Migration from Old Structure
+
+If you have an existing database with the old single payment method structure:
+
+1. **Run the main setup script** first (`scripts/setup-database.sql`)
+2. **Run the migration script** (`scripts/migrate-payment-methods.sql`)
+3. **Verify migration** using the verification queries
+
 ### What Gets Created
 
 #### Tables
-- **`users`** - User profiles and admin status
+- **`users`** - User profiles with multiple payment methods support
 - **`leads`** - Submitted leads from affiliates
-- **`payout_requests`** - Payout requests and processing
+- **`payout_requests`** - Payout requests with detailed payment information
+
+#### Payment Methods Structure
+- **`default_payout_method`** - User's default payment method type
+- **`payout_methods`** - JSONB array of payment method objects
+- **Payment method types**: PayPal, Wise, Bank Transfer
+- **Detailed payment information** for each method
 
 #### Security
 - **Row Level Security** on all tables
@@ -156,6 +180,49 @@ Visit `http://localhost:3000` to see your application!
 ### Provider Settings
 - ✅ **Enable Email Provider**
 - ❌ **Disable Google/GitHub** (for now)
+
+## 💳 Payment Methods
+
+### Supported Payment Methods
+
+#### PayPal
+- **Email address** for PayPal account
+- **Fast and secure** payments
+- **International support**
+
+#### Wise (TransferWise)
+- **Full name** of account holder
+- **Email address** for notifications
+- **Account ID** for faster transfers
+- **International transfers** with low fees
+
+#### Bank Transfer
+- **Account holder name**
+- **Bank name**
+- **IBAN** (International Bank Account Number)
+- **SWIFT/BIC** code
+- **Direct bank transfers**
+
+### Payment Method Management
+
+#### For Affiliate Users
+1. **Navigate to** `/dashboard/payout-settings`
+2. **Add payment methods** using the interface
+3. **Set default method** for automatic selection
+4. **Edit or delete** existing methods
+5. **View payment details** securely
+
+#### For Admins
+1. **View user payment methods** in user details
+2. **See payment details** in payout requests
+3. **Process payouts** with full payment information
+4. **Manage user accounts** and payment settings
+
+### Security Features
+- **Encrypted storage** of payment details
+- **Role-based access** to payment information
+- **Audit trail** for payment method changes
+- **Secure transmission** of payment data
 
 ## 🌍 Environment Variables
 
@@ -210,7 +277,8 @@ UPDATE users SET is_admin = true WHERE email = 'your-email@example.com';
 
 - **User Management**: View, suspend, and manage all users
 - **Lead Management**: Approve, reject, and process leads
-- **Payout Processing**: Handle payout requests
+- **Payout Processing**: Handle payout requests with payment details
+- **Payment Method Overview**: View user payment methods
 - **System Analytics**: View comprehensive statistics
 
 ## 🔧 Troubleshooting
@@ -234,8 +302,14 @@ UPDATE users SET is_admin = true WHERE email = 'your-email@example.com';
 - **Clear browser data** and try again
 - **Use incognito mode** for testing
 
+#### Payment Method Issues
+- **Check database migration** was completed
+- **Verify payment method structure** in database
+- **Clear browser cache** and try again
+- **Check user permissions** for payment settings
+
 #### Column Errors
-- **Run the clean setup script** to recreate tables
+- **Run the migration script** to update database structure
 - **Check for existing tables** with different structure
 - **Drop and recreate** if necessary
 
@@ -269,7 +343,7 @@ affiliate/
 │   └── ...               # Custom components
 ├── lib/                  # Utility functions
 ├── scripts/              # Database setup scripts
-└── ...                   # Configuration files
+└── SETUP.md             # Complete setup guide
 ```
 
 ## 🎯 Next Steps
