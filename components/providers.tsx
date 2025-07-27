@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
+import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react'
 import { supabase, User } from '@/lib/supabase'
 import { Session } from '@supabase/supabase-js'
 import { ToastProvider } from './toast'
@@ -19,7 +19,7 @@ export function Providers({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
 
-  const fetchUser = async (userId: string) => {
+  const fetchUser = useCallback(async (userId: string) => {
     try {
       const { data, error } = await supabase
         .from('users')
@@ -41,9 +41,9 @@ export function Providers({ children }: { children: ReactNode }) {
       console.error('Error fetching user:', error)
       return null
     }
-  }
+  }, [])
 
-  const initializeAuth = async () => {
+  const initializeAuth = useCallback(async () => {
     try {
       setLoading(true)
 
@@ -65,7 +65,7 @@ export function Providers({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [fetchUser])
 
   useEffect(() => {
     initializeAuth()
@@ -92,7 +92,7 @@ export function Providers({ children }: { children: ReactNode }) {
     )
 
     return () => subscription.unsubscribe()
-  }, [])
+  }, [initializeAuth, fetchUser])
 
   const signOut = async () => {
     try {
