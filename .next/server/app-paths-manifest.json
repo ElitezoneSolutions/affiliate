@@ -1,7 +1,7 @@
 {
-  "/admin/leads/page": "app/admin/leads/page.js",
+  "/page": "app/page.js",
+  "/login/page": "app/login/page.js",
   "/dashboard/page": "app/dashboard/page.js",
   "/dashboard/payouts/page": "app/dashboard/payouts/page.js",
-  "/dashboard/account-settings/page": "app/dashboard/account-settings/page.js",
-  "/dashboard/payout-settings/page": "app/dashboard/payout-settings/page.js"
+  "/dashboard/account-settings/page": "app/dashboard/account-settings/page.js"
 }

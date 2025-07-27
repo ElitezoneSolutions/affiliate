@@ -8,7 +8,6 @@ import { ArrowRight, TrendingUp, Users, DollarSign, Shield } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect } from 'react'
-import { DatabaseStatus } from '@/components/database-status'
 
 export default function HomePage() {
   const { user, loading } = useAuth()
@@ -47,11 +46,6 @@ export default function HomePage() {
             Submit qualified leads, track your earnings, and request payouts. 
             Join our affiliate program and start earning today.
           </p>
-        </div>
-
-        {/* Database Status */}
-        <div className="max-w-2xl mx-auto mb-8">
-          <DatabaseStatus />
         </div>
 
         <div className="max-w-4xl mx-auto">
