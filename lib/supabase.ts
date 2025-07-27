@@ -30,8 +30,9 @@ export type User = {
   last_name: string
   profile_image: string
   is_admin: boolean
+  is_suspended?: boolean
   payout_method?: string
-  payout_details?: string
+  payout_details?: any
   created_at: string
 }
 

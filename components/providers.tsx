@@ -35,8 +35,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
         .single()
 
       if (error) {
+        // If table doesn't exist, create a temporary user
         if (error.code === '42P01' || error.message.includes('relation "users" does not exist')) {
-          console.log('📋 Creating temporary user (table doesn\'t exist)')
+          console.log('📋 Creating temporary user (table doesn\'t exist yet)')
           const tempUser: User = {
             id: userId,
             email: userEmail,
@@ -78,7 +79,17 @@ export function Providers({ children }: { children: React.ReactNode }) {
             }
           } else {
             console.error('❌ Error creating user:', insertError)
-            setUser(null)
+            // Create temporary user instead of failing
+            const tempUser: User = {
+              id: userId,
+              email: userEmail,
+              first_name: '',
+              last_name: '',
+              profile_image: '',
+              is_admin: false,
+              created_at: new Date().toISOString()
+            }
+            setUser(tempUser)
           }
         } else if (newUser) {
           console.log('✅ Created new user')
@@ -90,7 +101,17 @@ export function Providers({ children }: { children: React.ReactNode }) {
       }
     } catch (error) {
       console.error('❌ Error in fetchUser:', error)
-      setUser(null)
+      // Create temporary user instead of failing
+      const tempUser: User = {
+        id: userId,
+        email: userEmail,
+        first_name: '',
+        last_name: '',
+        profile_image: '',
+        is_admin: false,
+        created_at: new Date().toISOString()
+      }
+      setUser(tempUser)
     }
   }, [])
 
@@ -106,7 +127,11 @@ export function Providers({ children }: { children: React.ReactNode }) {
         
         if (sessionError) {
           console.error('❌ Session error:', sessionError)
-          throw sessionError
+          // Don't throw, just continue without session
+          setUser(null)
+          setSession(null)
+          setLoading(false)
+          return
         }
 
         if (initialSession) {
@@ -129,7 +154,11 @@ export function Providers({ children }: { children: React.ReactNode }) {
               if (restoreError) {
                 console.error('❌ Error restoring session:', restoreError)
                 clearAuthCookie()
-                throw restoreError
+                // Don't throw, just continue without session
+                setUser(null)
+                setSession(null)
+                setLoading(false)
+                return
               }
 
               if (restoredSession) {
@@ -140,6 +169,11 @@ export function Providers({ children }: { children: React.ReactNode }) {
             } catch (error) {
               console.error('❌ Failed to restore session:', error)
               clearAuthCookie()
+              // Don't throw, just continue without session
+              setUser(null)
+              setSession(null)
+              setLoading(false)
+              return
             }
           } else {
             console.log('❌ No session found')
